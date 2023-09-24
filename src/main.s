@@ -114,6 +114,7 @@ entry_main
 
 		lda #$00
 		sta $d020
+		lda #$00
 		sta $d021
 
 		lda #$05										; enable Super-Extended Attribute Mode by asserting the FCLRHI and CHR16 signals - set bits 2 and 0 of $D054.
@@ -171,8 +172,8 @@ pal		lda verticalcenter+0
 		ldx #<(screenchars0 / 64 + 2*32)
 		ldy #>(screenchars0 / 64 + 2*32)
 
-put10	stx screen1+(320-256-16-16) + 0
-put11	sty screen1+(320-256-16-16) + 1
+put10	stx screen1+0
+put11	sty screen1+1
 
 		clc
 		txa
@@ -216,7 +217,6 @@ put11	sty screen1+(320-256-16-16) + 1
 		sta put11+2
 		clc
 		lda screencolumn
-		adc #8
 		sta put10+1
 		adc #$01
 		sta put11+1
@@ -224,6 +224,9 @@ put11	sty screen1+(320-256-16-16) + 1
 		jmp put10
 
 endscreenplot1
+
+		lda #$55										; CHRXSCL
+		sta $d05a
 
 		lda #$22										; Y Position Where Character Display Starts ($D04E LSB, 0–3 of $D04F MSB)
 		sta $d04e

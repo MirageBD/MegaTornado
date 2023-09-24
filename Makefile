@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 
-megabuild		= 1
+megabuild		= 0
 attachdebugger	= 0
 
 # -----------------------------------------------------------------------------
@@ -65,8 +65,6 @@ $(EXE_DIR)/boot.o:	$(SRC_DIR)/boot.s \
 					$(SRC_DIR)/irqload.s \
 					$(SRC_DIR)/decruncher.s \
 					$(SRC_DIR)/macros.s \
-					$(SRC_DIR)/mathmacros.s \
-					$(SRC_DIR)/model.s \
 					$(SRC_DIR)/modplay.s \
 					Makefile Linkfile
 	$(AS) $(ASFLAGS) -o $@ $<
