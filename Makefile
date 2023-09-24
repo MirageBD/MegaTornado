@@ -73,7 +73,7 @@ $(EXE_DIR)/boot.o:	$(SRC_DIR)/boot.s \
 
 $(BIN_DIR)/alldata.bin: $(BINFILES)
 	$(MEGAADDRESS) $(BIN_DIR)/bitmap_pal0.bin        0000c000
-	$(MEGAADDRESS) $(BIN_DIR)/song.mod               00040000
+	$(MEGAADDRESS) $(BIN_DIR)/song.mod               00030000
 	$(MEGACRUNCH) $(BIN_DIR)/bitmap_pal0.bin.addr
 	$(MEGACRUNCH) $(BIN_DIR)/song.mod.addr
 	$(MEGAIFFL) $(BINFILESMC) $(BIN_DIR)/alldata.bin
