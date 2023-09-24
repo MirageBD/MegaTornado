@@ -2,6 +2,8 @@
 
 .define screen1			$b000
 
+.define palette			$c000
+
 .define screenchars0	$10000
 .define screenchars1	$20000
 
@@ -76,6 +78,7 @@ entry_main
 		jsr fl_init
 		jsr fl_waiting
 		FLOPPY_IFFL_FAST_LOAD_INIT "MEGATRN.IFFLCRCH"
+		FLOPPY_IFFL_FAST_LOAD
 		FLOPPY_IFFL_FAST_LOAD
 		jsr fl_exit
 
@@ -206,10 +209,39 @@ put11	sty screen1+1
 
 endscreenplot1
 
+		lda #$12										; Y Position Where Character Display Starts ($D04E LSB, 0–3 of $D04F MSB)
+		sta $d04e
+		lda #35											; set number of rows
+		sta $d07b
+		lda #$00										; reposition start of top border to what's juuuuust visible on my monitor
+		sta $d048
+		lda #$50										; reposition start of bottom border to what's juuuuust visible on my monitor
+		sta $d04a
+		lda #$02
+		sta $d04b
+
 		lda #<$0800										; set (offset!) pointer to colour ram
 		sta $d064
 		lda #>$0800
 		sta $d065
+
+		lda $d070										; select mapped bank with the upper 2 bits of $d070
+		and #%00111111
+		sta $d070
+
+		ldx #$00										; set bitmap palette
+:		lda palette+$0000,x
+		sta $d100,x
+		lda palette+$0100,x
+		sta $d200,x
+		lda palette+$0200,x
+		sta $d300,x
+		inx
+		bne :-
+
+		lda $d070
+		and #%11001111									; clear bits 4 and 5 (BTPALSEL) so bitmap uses palette 0
+		sta $d070
 
 		lda #$7f										; disable CIA interrupts
 		sta $dc0d
@@ -240,7 +272,7 @@ loop
 
 .align 256
 
-.macro plotpixel offset
+.macro plotpixel offset, coladd
 		lda #<.loword(screenchars0 + offset)
 		sta zp0+0
 		lda #>.loword(screenchars0 + offset)
@@ -251,10 +283,9 @@ loop
 		sta zp0+3
 
 		ldz #$00
-		lda frame
-		lsr
-		lsr
-		lsr
+		lda plotcol
+		clc
+		adc coladd
 		sta [zp0],z
 .endmacro
 
@@ -311,15 +342,23 @@ irq1
 
 		jsr peppitoPlay
 
-		plotpixel (16 - 1) * (256 * 8) + 16 * 64 - 2 -  8
-		plotpixel (16 - 1) * (256 * 8) + 16 * 64 - 2 -  0
-		plotpixel (16 - 1) * (256 * 8) + 16 * 64 - 2 +  8
-		plotpixel (16 - 1) * (256 * 8) + 16 * 64 - 1 -  8
-		plotpixel (16 - 1) * (256 * 8) + 16 * 64 - 1 -  0
-		plotpixel (16 - 1) * (256 * 8) + 16 * 64 - 1 +  8
-		plotpixel (16 + 0) * (256 * 8) + 16 * 64 + 0 - 16
-		plotpixel (16 + 0) * (256 * 8) + 16 * 64 + 0 -  8
-		plotpixel (16 + 0) * (256 * 8) + 16 * 64 + 0 -  0
+		plotpixel ((16-1)*(256*8)+16*64-2-8), 0
+		plotpixel ((16-1)*(256*8)+16*64-2-0), 1
+		plotpixel ((16-1)*(256*8)+16*64-2+8), 2
+		plotpixel ((16-1)*(256*8)+16*64-1-8), 3
+		plotpixel ((16-1)*(256*8)+16*64-1-0), 4
+		plotpixel ((16-1)*(256*8)+16*64-1+8), 5
+		plotpixel ((16+0)*(256*8)+16*64+0-16), 6
+		plotpixel ((16+0)*(256*8)+16*64+0-8), 7
+		plotpixel ((16+0)*(256*8)+16*64+0-0), 8
+
+		lda frame
+		and #%00000001
+		bne :+
+		inc plotcol
+:
+		;lda #$02
+		;sta $d020
 
 		lda frame
 		and #%00001111
@@ -374,7 +413,13 @@ xloop			.repeat 16
 			jmp yloop
 :			
 
+		;lda #$04
+		;sta $d020
+
 		DMA_RUN_JOB copybufferjob
+
+		;lda #$00
+		;sta $d020
 
 		inc frame
 
@@ -382,10 +427,12 @@ xloop			.repeat 16
 		asl $d019
 		rti
 
-frame			.byte $00
+frame			.byte 0
 screenrow		.byte 0
 screencolumn	.byte 0
 verticalcenter	.byte 0
+
+plotcol			.byte 0
 
 yto				.word 0
 yfrom			.word 0
@@ -421,7 +468,7 @@ clearcolorramjob
 																;       6 MINTERM  SA,-DA bit
 																;       7 MINTERM  SA, DA bit
 
-				.word 40*26										; Count LSB + Count MSB
+				.word 40*36										; Count LSB + Count MSB
 
 				.word $0007										; this is normally the source addres, but contains the fill value now
 				.byte $00										; source bank (ignored)
