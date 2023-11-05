@@ -96,29 +96,6 @@
 .endscope
 .endmacro
 
-.macro FLOPPY_FAST_LOAD_OLD addr, fname
-.scope
-			bra :+
-FileName	.byte .sprintf("%s", fname), 0
-:			lda #<.loword(addr)
-			sta fastload_address+0
-			lda #>.loword(addr)
-			sta fastload_address+1
-			lda #<.hiword(addr)
-			sta fastload_address+2
-			lda #>.hiword(addr)
-			sta fastload_address+3
-
-			ldx #<FileName
-			ldy #>FileName
-			jsr fl_set_filename
-
-			lda #$01										; Request fastload job
-			sta fastload_request
-			jsr fl_waiting
-.endscope
-.endmacro
-
 .macro FLOPPY_IFFL_FAST_LOAD_INIT fname
 .scope
 			bra :+

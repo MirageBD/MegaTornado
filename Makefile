@@ -52,9 +52,6 @@ OBJS = $(EXE_DIR)/boot.o $(EXE_DIR)/main.o
 BINFILES  = $(BIN_DIR)/bitmap_pal0.bin
 BINFILES += $(BIN_DIR)/song.mod
 
-BINFILESMC  = $(BIN_DIR)/bitmap_pal0.bin.addr.mc
-BINFILESMC += $(BIN_DIR)/song.mod.addr.mc
-
 # -----------------------------------------------------------------------------
 
 $(BIN_DIR)/bitmap_pal0.bin: $(BIN_DIR)/bitmap.bin
@@ -69,13 +66,6 @@ $(EXE_DIR)/boot.o:	$(SRC_DIR)/boot.s \
 					Makefile Linkfile
 	$(AS) $(ASFLAGS) -o $@ $<
 
-$(BIN_DIR)/alldata.bin: $(BINFILES)
-	$(MEGAADDRESS) $(BIN_DIR)/bitmap_pal0.bin        0000c000
-	$(MEGAADDRESS) $(BIN_DIR)/song.mod               00030000
-	$(MEGACRUNCH) $(BIN_DIR)/bitmap_pal0.bin.addr
-	$(MEGACRUNCH) $(BIN_DIR)/song.mod.addr
-	$(MEGAIFFL) $(BINFILESMC) $(BIN_DIR)/alldata.bin
-
 $(EXE_DIR)/boot.prg.addr.mc: $(BINFILES) $(EXE_DIR)/boot.o Linkfile
 	$(LD) -Ln $(EXE_DIR)/boot.maptemp --dbgfile $(EXE_DIR)/boot.dbg -C Linkfile -o $(EXE_DIR)/boot.prg $(EXE_DIR)/boot.o
 	$(MEGAADDRESS) $(EXE_DIR)/boot.prg 00002100
@@ -86,7 +76,6 @@ $(EXE_DIR)/megatorn.d81: $(EXE_DIR)/boot.prg.addr.mc $(BIN_DIR)/alldata.bin
 	$(CC1541) -n "megatornado" -i " 2023" -d 19 -v\
 	 \
 	 -f "megatorn" -w $(EXE_DIR)/boot.prg.addr.mc \
-	 -f "megatrn.ifflcrch" -w $(BIN_DIR)/alldata.bin \
 	$@
 
 # -----------------------------------------------------------------------------

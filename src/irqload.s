@@ -114,20 +114,6 @@ endofname
 
 		rts
 
-; ----------------------------------------------------------------------------------------------------
-
-fl_set_startaddress
-
-		lda #$00										; Set load address (32-bit) $07ff ($0801 - 2 bytes for BASIC header)
-		sta fastload_address + 0
-		lda #$80
-		sta fastload_address + 1
-		lda #$00
-		sta fastload_address + 2
-		lda #$00
-		sta fastload_address + 3
-
-		rts
 
 ; ----------------------------------------------------------------------------------------------------
 

@@ -20,6 +20,12 @@
 
 ; ----------------------------------------------------------------------------------------------------
 
+.segment "PALETTE"
+		.incbin "../bin/bitmap_pal0.bin"
+
+.segment "SONG"
+		.incbin "../bin/song.mod"
+
 .segment "MAIN"
 
 entry_main
@@ -89,13 +95,14 @@ entry_main
 
 		cli
 
+/*
 		jsr fl_init
 		jsr fl_waiting
 		FLOPPY_IFFL_FAST_LOAD_INIT "MEGATRN.IFFLCRCH"
 		FLOPPY_IFFL_FAST_LOAD
 		FLOPPY_IFFL_FAST_LOAD
 		jsr fl_exit
-
+*/
 		sei
 
 		lda #$35
