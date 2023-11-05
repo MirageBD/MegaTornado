@@ -71,7 +71,7 @@ $(EXE_DIR)/boot.prg.addr.mc: $(BINFILES) $(EXE_DIR)/boot.o Linkfile
 	$(MEGAADDRESS) $(EXE_DIR)/boot.prg 00002100
 	$(MEGACRUNCH) -e 00002100 $(EXE_DIR)/boot.prg.addr
 
-$(EXE_DIR)/megatorn.d81: $(EXE_DIR)/boot.prg.addr.mc $(BIN_DIR)/alldata.bin
+$(EXE_DIR)/megatorn.d81: $(EXE_DIR)/boot.prg.addr.mc $(BINFILES)
 	$(RM) $@
 	$(CC1541) -n "megatornado" -i " 2023" -d 19 -v\
 	 \
