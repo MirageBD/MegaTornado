@@ -232,12 +232,12 @@ put11	sty screen1+1
 
 endscreenplot1
 
-		lda #$55										; CHRXSCL
+		lda #$5a ; #$55										; CHRXSCL
 		sta $d05a
 
 		lda #$22										; Y Position Where Character Display Starts ($D04E LSB, 0–3 of $D04F MSB)
 		sta $d04e
-		lda #35											; set number of rows
+		lda #29											; set number of rows
 		sta $d07b
 		lda #$40										; reposition start of top border to what's juuuuust visible on my monitor
 		sta $d048
@@ -315,56 +315,11 @@ loop
 		sta [zp0],z
 .endmacro
 
-.macro	copyline
-.scope
-		lda yto+0
-		sta to+0
-		lda yto+1
-		sta to+1
-		lda xto
-		and #$07
-		;clc
-		adc to+0
-		sta to+0
-		lda xto
-		and #$f8
-		adc to+1
-		sta to+1
-
-		lda yfrom+0
-		sta from+0
-		lda yfrom+1
-		sta from+1
-		lda xfrom
-		and #$07
-		;clc
-		adc from+0
-		sta from+0
-		lda xfrom
-		and #$f8
-		adc from+1
-		sta from+1
-
-		sta $d707										; inline DMA copy
-		;.byte $82, $00									; Source skip rate (256ths of bytes)
-		.byte $83, $08									; Source skip rate (whole bytes)
-		;.byte $84, $00									; Destination skip rate (256ths of bytes)
-		.byte $85, $08									; Destination skip rate (whole bytes)
-		.byte $00										; end of job options
-		.byte $00										; copy
-		.word $0010										; count
-from	.word $0000										; src
-		.byte <.hiword(screenchars0)					; src bank and flags
-to		.word $0000										; dst
-		.byte <.hiword(screenchars1)					; dst bank and flags
-		.byte $00										; cmd hi
-		.word $0000										; modulo, ignored
-
-.endscope		
-.endmacro
-
 irq1
 		pha
+
+		lda #$10
+		sta $d020
 
 		jsr peppitoPlay
 
@@ -384,8 +339,8 @@ irq1
 		inc plotcol
 :
 
-		;lda #$08
-		;sta $d020
+		lda #$08
+		sta $d020
 
 		lda frame
 		and #%00001111
@@ -404,6 +359,7 @@ irq1
 		sta yfrom+1
 
 		ldy #14
+
 yloop		lda shift
 			sta xto
 			sta xfrom
@@ -412,11 +368,103 @@ yloop		lda shift
 			adc xfrom
 			sta xfrom
 			ldx #14
-xloop			.repeat 16
-					copyline
-					inc xto
-					inc xfrom
-				.endrepeat
+xloop
+
+				lda yto+0
+				sta to+0
+				lda yto+1
+				sta to+1
+
+				clc
+				lda xto
+				and #$07
+				adc to+0
+				sta to+0
+
+				lda xto
+				and #(256-8)
+				adc to+1
+				sta to+1
+
+				lda yfrom+0
+				sta from+0
+				lda yfrom+1
+				sta from+1
+
+				lda xfrom
+				and #$07
+				clc
+				adc from+0
+				sta from+0
+
+				lda xfrom
+				and #(256-8)
+				adc from+1
+				sta from+1
+						
+				ldz #16
+innerloop:
+					sta $d707										; inline DMA copy
+					;.byte $82, $00									; Source skip rate (256ths of bytes)
+					.byte $83, $08									; Source skip rate (whole bytes)
+					;.byte $84, $00									; Destination skip rate (256ths of bytes)
+					.byte $85, $08									; Destination skip rate (whole bytes)
+					.byte $00										; end of job options
+					.byte $00										; copy
+					.word 16										; count
+from				.word $0000										; src
+					.byte <.hiword(screenchars0)					; src bank and flags
+to					.word $0000										; dst
+					.byte <.hiword(screenchars1)					; dst bank and flags
+					.byte $00										; cmd hi
+					.word $0000										; modulo, ignored
+
+					inc from+0
+					inc to+0
+
+					lda from+0
+					and #7
+					bne from_not_crossed
+;from_crossed
+					lda from+0
+					bne from_not_crossed_hi
+					inc from+1
+from_not_crossed_hi	clc
+					adc #<(((256/8)*64)-8)			; add $07f8
+					sta from+0
+					lda from+1
+					adc #>(((256/8)*64)-8)
+					sta from+1
+from_not_crossed
+
+					lda to+0
+					and #7
+					bne to_not_crossed
+;to_crossed
+					lda to+0
+					bne to_not_crossed_hi
+					inc to+1
+to_not_crossed_hi	clc
+					adc #<(((256/8)*64)-8)
+					sta to+0
+					lda to+1
+					adc #>(((256/8)*64)-8)
+					sta to+1
+to_not_crossed
+
+				dez
+				bne innerloop
+
+				clc
+				lda xto
+				adc #16
+				sta xto
+
+				clc
+				lda xfrom
+				adc #15							; was 16, but I was subtracting one again afterwards
+				sta xfrom
+
 				;clc
 				lda yfrom+0
 				adc #$08
@@ -424,10 +472,11 @@ xloop			.repeat 16
 				lda yfrom+1
 				adc #$00
 				sta yfrom+1
-				dec xfrom
+				
 				dex
 				bmi :+
 				jmp xloop
+
 :			;clc
 			lda yto+0
 			adc #128
@@ -440,13 +489,13 @@ xloop			.repeat 16
 			jmp yloop
 :			
 
-		;lda #$15
-		;sta $d020
+		lda #$15
+		sta $d020
 
 		DMA_RUN_JOB copybufferjob
 
-		;lda #$00
-		;sta $d020
+		lda #$00
+		sta $d020
 
 		inc frame
 
@@ -657,3 +706,5 @@ copybufferjob
 				.byte ((screenchars0 >> 16) & $0f)
 
 				.word $0000
+
+; -------------------------------------------------------------------------------------------------
