@@ -232,7 +232,7 @@ put11	sty screen1+1
 
 endscreenplot1
 
-		lda #$5a ; #$55										; CHRXSCL
+		lda #$55 ; #$55									; CHRXSCL - we want to scale 240 up to 320 and the default value of xscale is 120 (why not 128?), so (120*(240/320) = 90)
 		sta $d05a
 
 		lda #$22										; Y Position Where Character Display Starts ($D04E LSB, 0–3 of $D04F MSB)
@@ -323,15 +323,15 @@ irq1
 
 		jsr peppitoPlay
 
-		plotpixel ((16-1)*(256*8)+16*64-2-8), 0
-		plotpixel ((16-1)*(256*8)+16*64-2-0), 0
-		plotpixel ((16-1)*(256*8)+16*64-2+8), 0
-		plotpixel ((16-1)*(256*8)+16*64-1-8), 0
-		plotpixel ((16-1)*(256*8)+16*64-1-0), 1
-		plotpixel ((16-1)*(256*8)+16*64-1+8), 1
+		plotpixel ((16-1)*(256*8)+16*64-2-8),  0
+		plotpixel ((16-1)*(256*8)+16*64-2-0),  0
+		plotpixel ((16-1)*(256*8)+16*64-2+8),  0
+		plotpixel ((16-1)*(256*8)+16*64-1-8),  0
+		plotpixel ((16-1)*(256*8)+16*64-1-0),  1
+		plotpixel ((16-1)*(256*8)+16*64-1+8),  1
 		plotpixel ((16+0)*(256*8)+16*64+0-16), 1
-		plotpixel ((16+0)*(256*8)+16*64+0-8), 1
-		plotpixel ((16+0)*(256*8)+16*64+0-0), 1
+		plotpixel ((16+0)*(256*8)+16*64+0-8),  1
+		plotpixel ((16+0)*(256*8)+16*64+0-0),  1
 
 		lda frame
 		and #%00000001
@@ -370,42 +370,33 @@ yloop		lda shift
 			ldx #14
 xloop
 
-				lda yto+0
-				sta to+0
-				lda yto+1
-				sta to+1
-
-				clc
+				;clc
 				lda xto
 				and #$07
-				adc to+0
+				adc yto+0
 				sta to+0
 
 				lda xto
 				and #(256-8)
-				adc to+1
+				adc yto+1
 				sta to+1
 
-				lda yfrom+0
-				sta from+0
-				lda yfrom+1
-				sta from+1
-
+				;clc
 				lda xfrom
 				and #$07
-				clc
-				adc from+0
+				adc yfrom+0
 				sta from+0
 
 				lda xfrom
 				and #(256-8)
-				adc from+1
+				adc yfrom+1
 				sta from+1
-						
+
 				ldz #16
 innerloop:
 					sta $d707										; inline DMA copy
-					;.byte $82, $00									; Source skip rate (256ths of bytes)
+					;.byte $06										; Disable use of transparent value
+					;.byte $07										; Enable use of transparent value					;.byte $82, $00									; Source skip rate (256ths of bytes)
 					.byte $83, $08									; Source skip rate (whole bytes)
 					;.byte $84, $00									; Destination skip rate (256ths of bytes)
 					.byte $85, $08									; Destination skip rate (whole bytes)
@@ -429,7 +420,7 @@ to					.word $0000										; dst
 					lda from+0
 					bne from_not_crossed_hi
 					inc from+1
-from_not_crossed_hi	clc
+from_not_crossed_hi	;clc
 					adc #<(((256/8)*64)-8)			; add $07f8
 					sta from+0
 					lda from+1
@@ -444,7 +435,7 @@ from_not_crossed
 					lda to+0
 					bne to_not_crossed_hi
 					inc to+1
-to_not_crossed_hi	clc
+to_not_crossed_hi	;clc
 					adc #<(((256/8)*64)-8)
 					sta to+0
 					lda to+1
@@ -455,12 +446,12 @@ to_not_crossed
 				dez
 				bne innerloop
 
-				clc
+				;clc
 				lda xto
 				adc #16
 				sta xto
 
-				clc
+				;clc
 				lda xfrom
 				adc #15							; was 16, but I was subtracting one again afterwards
 				sta xfrom
@@ -484,6 +475,7 @@ to_not_crossed
 			lda yto+1
 			adc #0
 			sta yto+1
+
 			dey
 			bmi :+
 			jmp yloop
@@ -664,7 +656,7 @@ clearbitmapjob
 																; 11 byte DMA List structure starts here
 				.byte %00000011									; fill and don't chain
 
-				.word 40*25*64									; Count LSB + Count MSB
+				.word 240*256									; Count LSB + Count MSB
 
 				.word $0000										; this is normally the source addres, but contains the fill value now
 				.byte $00										; source bank (ignored)
@@ -684,6 +676,8 @@ clearbitmapjob
 copybufferjob
 				;DMA_HEADER $20000 >> 20, $30000 >> 20
 				; f018a = 11 bytes, f018b is 12 bytes
+				.byte $06								; Disable use of transparent value
+				;.byte $07								; Enable use of transparent value
 				.byte $0a ; Request format is F018A
 				.byte $80, (screenchars1 >> 20) ; sourcebank
 				.byte $81, (screenchars0 >> 20) ; destbank
