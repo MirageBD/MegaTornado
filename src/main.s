@@ -364,9 +364,10 @@ yloop		lda shift
 			sta xto
 			sta xfrom
 			tya
-			clc
+			;clc
 			adc xfrom
 			sta xfrom
+
 			ldx #14
 xloop
 
@@ -503,8 +504,10 @@ verticalcenter	.byte 0
 plotcol			.byte 0
 
 
-shifts			.byte 0, 8, 4, 12, 2, 10, 6, 14
+shifts
+				.byte 0, 8, 4, 12, 2, 10, 6, 14
 				.byte 1, 9, 5, 13, 3, 11, 7, 15
+
 ; ----------------------------------------------------------------------------------------------------
 
 clearcolorramjob
@@ -656,7 +659,7 @@ clearbitmapjob
 																; 11 byte DMA List structure starts here
 				.byte %00000011									; fill and don't chain
 
-				.word 240*256									; Count LSB + Count MSB
+				.word 0 ; 240*256									; Count LSB + Count MSB
 
 				.word $0000										; this is normally the source addres, but contains the fill value now
 				.byte $00										; source bank (ignored)
@@ -691,7 +694,7 @@ copybufferjob
 				.byte $00 ; No more options
 
 				.byte $00 ; Copy and last request
-				.word 32*32*64-1 ; Size of Copy
+				.word 240*256 ; 32*32*64-1 ; Size of Copy
 
 				.word screenchars1 & $ffff
 				.byte (screenchars1 >> 16)
