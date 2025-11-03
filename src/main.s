@@ -200,19 +200,19 @@ pal		lda verticalcenter+0
 		lda #$55 ; #$55									; CHRXSCL - we want to scale 240 up to 320 and the default value of xscale is 120 (why not 128?), so (120*(240/320) = 90)
 		sta $d05a
 
-		lda #$10										; start of top border
+		lda #$40										; start of top border
 		sta $d048
-		lda #$40-28										; skip one row of chars before draw. Y Position Where Character Display Starts ($D04E LSB, 0–3 of $D04F MSB)
+		lda #$44										; Y Position Where Character Display Starts ($D04E LSB, 0–3 of $D04F MSB)
 		sta $d04e
-		lda #29											; set number of rows
+		lda #28											; set number of rows
 		sta $d07b
-		lda #$34										; start of bottom border
+		lda #$08										; start of bottom border
 		sta $d04a
 		lda #$02
 		sta $d04b
-		lda #$50										; set TEXTXPOS
+		lda #$4e										; set TEXTXPOS
 		sta $d04c
-		lda #$40										; set left border
+		lda #$4a										; set left border
 		sta $d05c
 
 
