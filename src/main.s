@@ -1,25 +1,32 @@
-.define emptychar		$ff80							; size = 64
+.define emptychar			$ff80							; size = 64
 
-.define screen0			$b000
-.define screen1			$e000
+.define screen0				$b000
+.define screen1				$e000
 
-.define palette			$c000
+.define palette				$c000
 
-.define screenchars0	$10000
-.define screenchars1	$20000
+.define screenchars0		$10000
+.define screenchars1		$20000
 
-.define moddata			$30000
+.define screenchars0div64	screenchars0/64
+.define screenchars1div64	screenchars1/64
 
-.define zp0				$04								; size = 4
+.define moddata				$30000
 
-.define yto				$08
-.define yfrom			$0a
-.define xto				$0c
-.define xfrom			$0d
+.define zp0					$04								; size = 4
 
-.define shift			$0e
+.define yto					$08
+.define yfrom				$0a
+.define xto					$0c
+.define xfrom				$0d
 
-.define flipflop		$0f
+.define shift				$0e
+
+.define flipflop			$0f
+
+.define MULTINA				$d770
+.define MULTINB				$d774
+.define MULTOUT				$d778
 
 ; ----------------------------------------------------------------------------------------------------
 
@@ -175,139 +182,39 @@ pal		lda verticalcenter+0
 		lda #>.hiword(screen0)
 		sta $d063
 
-		lda #$00
-		sta screenrow
-		sta screencolumn
 
-		ldx #<(screenchars0 / 64 + 2*32)
-		ldy #>(screenchars0 / 64 + 2*32)
 
-put10	stx screen0+0
-put11	sty screen0+1
 
-		clc
-		txa
-		adc #$01
-		tax
-		tya
-		adc #$00
-		tay
-
-		clc
-		lda put10+1
-		adc #80
-		sta put10+1
-		lda put10+2
-		adc #0
-		sta put10+2
-
-		clc
-		lda put11+1
-		adc #80
-		sta put11+1
-		lda put11+2
-		adc #0
-		sta put11+2
-
-		inc screenrow
-		lda screenrow
-		cmp #32
-		bne put10
-
-		lda #0
-		sta screenrow
-		inc screencolumn
-		inc screencolumn
-		lda screencolumn
-		cmp #28*2
-		beq endscreenplot1
-
+		ldx #<(screenchars0 / 64 + 2*32)				; X contains low  byte of character address
+		ldy #>(screenchars0 / 64 + 2*32)				; Y contains high byte of character address
 		lda #>screen0
-		sta put10+2
-		sta put11+2
-		clc
-		lda screencolumn
-		sta put10+1
-		adc #$01
-		sta put11+1
+		jsr setuptextscreen
 
-		jmp put10
-
-endscreenplot1
-
-		lda #$00
-		sta screenrow
-		sta screencolumn
-
-		ldx #<(screenchars1 / 64 + 2*32)
-		ldy #>(screenchars1 / 64 + 2*32)
-
-put20	stx screen1+0
-put21	sty screen1+1
-
-		clc
-		txa
-		adc #$01
-		tax
-		tya
-		adc #$00
-		tay
-
-		clc
-		lda put20+1
-		adc #80
-		sta put20+1
-		lda put20+2
-		adc #0
-		sta put20+2
-
-		clc
-		lda put21+1
-		adc #80
-		sta put21+1
-		lda put21+2
-		adc #0
-		sta put21+2
-
-		inc screenrow
-		lda screenrow
-		cmp #32
-		bne put20
-
-		lda #0
-		sta screenrow
-		inc screencolumn
-		inc screencolumn
-		lda screencolumn
-		cmp #28*2
-		beq endscreenplot2
-
+		ldx #<(screenchars1 / 64 + 2*32)				; X contains low  byte of character address
+		ldy #>(screenchars1 / 64 + 2*32)				; Y contains high byte of character address
 		lda #>screen1
-		sta put20+2
-		sta put21+2
-		clc
-		lda screencolumn
-		sta put20+1
-		adc #$01
-		sta put21+1
+		jsr setuptextscreen
 
-		jmp put20
 
-endscreenplot2
 
 		lda #$55 ; #$55									; CHRXSCL - we want to scale 240 up to 320 and the default value of xscale is 120 (why not 128?), so (120*(240/320) = 90)
 		sta $d05a
 
-		lda #$40										; start of top border
+		lda #$10										; start of top border
 		sta $d048
 		lda #$40-28										; skip one row of chars before draw. Y Position Where Character Display Starts ($D04E LSB, 0–3 of $D04F MSB)
 		sta $d04e
 		lda #29											; set number of rows
 		sta $d07b
-		lda #$04										; start of bottom border
+		lda #$34										; start of bottom border
 		sta $d04a
 		lda #$02
 		sta $d04b
+		lda #$50										; set TEXTXPOS
+		sta $d04c
+		lda #$40										; set left border
+		sta $d05c
+
 
 		lda #<$0800										; set (offset!) pointer to colour ram
 		sta $d064
@@ -361,6 +268,79 @@ loop
 		jmp loop
 
 ; ----------------------------------------------------------------------------------------------------
+
+.define txtstartrow		0
+.define txtstartcolumn	0
+.define txtheight		32
+.define txtwidth		28
+
+setuptextscreen:
+
+		sta put10+2
+		sta put11+2
+		sta put12+1
+		lda #0
+		sta put10+1
+		lda #1
+		sta put11+1
+
+		lda #txtstartrow
+		sta screenrow
+		lda #txtstartcolumn
+		sta screencolumn
+
+put10	stx screen0+0
+put11	sty screen0+1
+
+		clc												; add 1 to character address
+		txa
+		adc #$01
+		tax
+		tya
+		adc #$00
+		tay
+
+		clc												; and move to next row
+		lda put10+1
+		adc #80
+		sta put10+1
+		sta put11+1
+		lda put10+2
+		adc #0
+		sta put10+2
+		sta put11+2
+		inc put11+1
+
+		inc screenrow									;  have we reached the end row?
+		lda screenrow
+		cmp #(txtstartrow + txtheight)
+		bne put10
+
+		lda #txtstartrow								; we have reached the end row
+		sta screenrow									; reset row back to 0
+		inc screencolumn								; and increase the column
+		inc screencolumn
+		lda screencolumn
+		cmp #(txtstartcolumn+txtwidth)*2				; have we reached the end column?
+		beq endscreenplot
+
+		; calculate new start position here
+
+put12	lda #>screen0									; reset the destination high byte
+		sta put10+2
+		sta put11+2
+		clc
+		lda screencolumn
+		sta put10+1
+		adc #$01
+		sta put11+1
+
+		jmp put10
+
+endscreenplot
+		rts
+
+; ----------------------------------------------------------------------------------------------------		
 
 .align 256
 
@@ -495,7 +475,7 @@ xloop
 				sta from+1
 
 				ldz #16
-innerloop:
+zloop:
 					sta $d707										; inline DMA copy
 					;.byte $06										; Disable use of transparent value
 					;.byte $07										; Enable use of transparent value					;.byte $82, $00									; Source skip rate (256ths of bytes)
@@ -511,6 +491,9 @@ to					.word $0000										; dst
 					.byte <.hiword(screenchars1)					; dst bank and flags
 					.byte $00										; cmd hi
 					.word $0000										; modulo, ignored
+
+					dez
+					beq exit_zloop
 
 					inc from+0
 					inc to+0
@@ -544,9 +527,9 @@ to_not_crossed_hi	;clc
 					adc #>(((256/8)*64)-8)
 					sta to+1
 to_not_crossed
+					bra zloop
 
-				dez
-				bne innerloop
+exit_zloop:
 
 				;clc
 				lda xto
@@ -567,10 +550,15 @@ to_not_crossed
 				sta yfrom+1
 				
 				dex
-				bmi :+
+				bmi exit_xloop
 				jmp xloop
 
-:			;clc
+exit_xloop:
+
+			dey
+			bmi exit_yloop
+
+			;clc
 			lda yto+0
 			adc #128
 			sta yto+0
@@ -578,10 +566,15 @@ to_not_crossed
 			adc #0
 			sta yto+1
 
-			dey
-			bmi :+
 			jmp yloop
-:			
+
+exit_yloop:			
+
+		lda #$94
+		sta $d020
+
+		;DMA_RUN_JOB clearbitmap0checkeredjob
+		;DMA_RUN_JOB clearbitmap1checkeredjob
 
 		lda #$84
 		sta $d020
@@ -592,17 +585,17 @@ to_not_crossed
 		asl $d019
 		rti
 
-frame			.byte 0
-screenrow		.byte 0
-screencolumn	.byte 0
-verticalcenter	.byte 0
+; ----------------------------------------------------------------------------------------------------
 
-plotcol			.byte 0
+frame				.byte 0
+screenrow			.byte 0
+screencolumn		.byte 0
+verticalcenter		.byte 0
 
+plotcol				.byte 0
 
-shifts
-				.byte 0, 8, 4, 12, 2, 10, 6, 14
-				.byte 1, 9, 5, 13, 3, 11, 7, 15
+shifts				.byte 0, 8, 4, 12, 2, 10, 6, 14
+					.byte 1, 9, 5, 13, 3, 11, 7, 15
 
 ; ----------------------------------------------------------------------------------------------------
 
@@ -715,6 +708,60 @@ clearbitmap1job:
 				.word 0 ; 240*256								; Count LSB + Count MSB
 
 				.word $0020										; this is normally the source addres, but contains the fill value now
+				.byte $00										; source bank (ignored)
+
+				.word $0000										; Destination Address LSB + Destination Address MSB
+				.byte ((screenchars1 >> 16) & $0f)				; Destination Address BANK and FLAGS (copy to rbBaseMem)
+																;     0–3 Memory BANK within the selected MB (0-15)
+																;       4 HOLD,      i.e., do not change the address
+																;       5 MODULO,    i.e., apply the MODULO field to wraparound within a limited memory space
+																;       6 DIRECTION. If set, then the address is decremented instead of incremented.
+																;       7 I/O.       If set, then I/O registers are visible during the DMA controller at $D000 – $DFFF.
+
+				.word $0000
+
+; -------------------------------------------------------------------------------------------------
+
+clearbitmap0checkeredjob:
+				.byte $0a										; Request format (f018a = 11 bytes (Command MSB is $00), f018b is 12 bytes (Extra Command MSB))
+				.byte $81, (screenchars0 >> 20)					; dest megabyte   ($0000000 >> 20) ($00 is  chip ram)
+				.byte $84, $00									; Destination skip rate (256ths of bytes)
+				.byte $85, 16									; Destination skip rate (whole bytes)
+
+				.byte $00										; No more options
+
+																; 11 byte DMA List structure starts here
+				.byte %00000011									; fill and don't chain
+
+				.word 16*256										; Count LSB + Count MSB
+
+				.word $0000										; this is normally the source addres, but contains the fill value now
+				.byte $00										; source bank (ignored)
+
+				.word $0000										; Destination Address LSB + Destination Address MSB
+				.byte ((screenchars0 >> 16) & $0f)				; Destination Address BANK and FLAGS (copy to rbBaseMem)
+																;     0–3 Memory BANK within the selected MB (0-15)
+																;       4 HOLD,      i.e., do not change the address
+																;       5 MODULO,    i.e., apply the MODULO field to wraparound within a limited memory space
+																;       6 DIRECTION. If set, then the address is decremented instead of incremented.
+																;       7 I/O.       If set, then I/O registers are visible during the DMA controller at $D000 – $DFFF.
+
+				.word $0000
+
+clearbitmap1checkeredjob:
+				.byte $0a										; Request format (f018a = 11 bytes (Command MSB is $00), f018b is 12 bytes (Extra Command MSB))
+				.byte $81, (screenchars0 >> 20)					; dest megabyte   ($0000000 >> 20) ($00 is  chip ram)
+				.byte $84, $00									; Destination skip rate (256ths of bytes)
+				.byte $85, 16									; Destination skip rate (whole bytes)
+
+				.byte $00										; No more options
+
+																; 11 byte DMA List structure starts here
+				.byte %00000011									; fill and don't chain
+
+				.word 16*256										; Count LSB + Count MSB
+
+				.word $0000										; this is normally the source addres, but contains the fill value now
 				.byte $00										; source bank (ignored)
 
 				.word $0000										; Destination Address LSB + Destination Address MSB
