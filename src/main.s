@@ -298,13 +298,13 @@ endscreenplot2
 		lda #$55 ; #$55									; CHRXSCL - we want to scale 240 up to 320 and the default value of xscale is 120 (why not 128?), so (120*(240/320) = 90)
 		sta $d05a
 
-		lda #$22										; Y Position Where Character Display Starts ($D04E LSB, 0–3 of $D04F MSB)
+		lda #$40										; start of top border
+		sta $d048
+		lda #$40-28										; skip one row of chars before draw. Y Position Where Character Display Starts ($D04E LSB, 0–3 of $D04F MSB)
 		sta $d04e
 		lda #29											; set number of rows
 		sta $d07b
-		lda #$40										; reposition start of top border to what's juuuuust visible on my monitor
-		sta $d048
-		lda #$08										; reposition start of bottom border to what's juuuuust visible on my monitor
+		lda #$04										; start of bottom border
 		sta $d04a
 		lda #$02
 		sta $d04b
@@ -380,7 +380,7 @@ loop
 irq1
 		pha
 
-		lda #$10
+		lda #$88
 		sta $d020
 
 		lda #0
@@ -583,7 +583,7 @@ to_not_crossed
 			jmp yloop
 :			
 
-		lda #$00
+		lda #$84
 		sta $d020
 
 		inc frame
