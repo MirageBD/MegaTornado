@@ -185,13 +185,13 @@ pal		lda verticalcenter+0
 
 
 
-		ldx #<(screenchars0 / 64 + 2*32)				; X contains low  byte of character address
-		ldy #>(screenchars0 / 64 + 2*32)				; Y contains high byte of character address
+		ldx #<(screenchars0 / 64 + 2*32 + 2)				; add two columns and 2 rows
+		ldy #>(screenchars0 / 64 + 2*32 + 2)
 		lda #>screen0
 		jsr setuptextscreen
 
-		ldx #<(screenchars1 / 64 + 2*32)				; X contains low  byte of character address
-		ldy #>(screenchars1 / 64 + 2*32)				; Y contains high byte of character address
+		ldx #<(screenchars1 / 64 + 2*32 + 2)
+		ldy #>(screenchars1 / 64 + 2*32 + 2)
 		lda #>screen1
 		jsr setuptextscreen
 
@@ -251,7 +251,7 @@ pal		lda verticalcenter+0
 		lda #$00										; disable IRQ raster interrupts because C65 uses raster interrupts in the ROM
 		sta $d01a
 
-		lda #$1e										; setup IRQ interrupt
+		lda #$10										; setup IRQ interrupt
 		sta $d012
 		lda #<irq1
 		sta $fffe
@@ -271,7 +271,7 @@ loop
 
 .define txtstartrow		0
 .define txtstartcolumn	0
-.define txtheight		32
+.define txtheight		28
 .define txtwidth		28
 
 setuptextscreen:
@@ -334,6 +334,14 @@ put12	lda #>screen0									; reset the destination high byte
 		sta put10+1
 		adc #$01
 		sta put11+1
+
+		clc												; add remainder to character address
+		txa
+		adc #<(32-txtheight)
+		tax
+		tya
+		adc #$00
+		tay
 
 		jmp put10
 
