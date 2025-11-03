@@ -20,7 +20,7 @@
 .define xto					$0c
 .define xfrom				$0d
 
-.define shift				$0e
+.define shiftx				$0e
 
 .define flipflop			$0f
 
@@ -251,7 +251,7 @@ pal		lda verticalcenter+0
 		lda #$00										; disable IRQ raster interrupts because C65 uses raster interrupts in the ROM
 		sta $d01a
 
-		lda #$10										; setup IRQ interrupt
+		lda #$20										; setup IRQ interrupt
 		sta $d012
 		lda #<irq1
 		sta $fffe
@@ -410,15 +410,15 @@ doublebuffer1:
 		sta $d063
 doublebufferend:
 
-		jsr peppitoPlay
-
 		plotpixel ((16-1)*(256*8)+16*64-2-8),  0
 		plotpixel ((16-1)*(256*8)+16*64-2-0),  0
 		plotpixel ((16-1)*(256*8)+16*64-2+8),  0
+
 		plotpixel ((16-1)*(256*8)+16*64-1-8),  0
 		plotpixel ((16-1)*(256*8)+16*64-1-0),  1
 		plotpixel ((16-1)*(256*8)+16*64-1+8),  1
-		plotpixel ((16+0)*(256*8)+16*64+0-16), 1
+
+		plotpixel ((16+0)*(256*8)+16*64+0-16), 0
 		plotpixel ((16+0)*(256*8)+16*64+0-8),  1
 		plotpixel ((16+0)*(256*8)+16*64+0-0),  1
 
@@ -434,10 +434,11 @@ doublebufferend:
 		lda frame
 		and #%00001111
 		tax
-		lda shifts,x
-		sta shift
+		lda shiftsx,x
+		sta shiftx
 
-		asl
+		lda shiftsy,x
+		asl								; multiply shift by 8 to get yshift
 		asl
 		asl
 		sta yto+0
@@ -449,7 +450,7 @@ doublebufferend:
 
 		ldy #14
 
-yloop		lda shift
+yloop		lda shiftx					; get shift again but assign to xfrom/to
 			sta xto
 			sta xfrom
 			tya
@@ -481,6 +482,10 @@ xloop
 				and #(256-8)
 				adc yfrom+1
 				sta from+1
+
+				lda $d020
+				eor #$ff
+				sta $d020
 
 				ldz #16
 zloop:
@@ -539,6 +544,10 @@ to_not_crossed
 
 exit_zloop:
 
+				lda $d020
+				eor #$ff
+				sta $d020
+			
 				;clc
 				lda xto
 				adc #16
@@ -581,6 +590,8 @@ exit_yloop:
 		lda #$94
 		sta $d020
 
+		jsr peppitoPlay
+
 		;DMA_RUN_JOB clearbitmap0checkeredjob
 		;DMA_RUN_JOB clearbitmap1checkeredjob
 
@@ -602,7 +613,12 @@ verticalcenter		.byte 0
 
 plotcol				.byte 0
 
-shifts				.byte 0, 8, 4, 12, 2, 10, 6, 14
+shiftsx
+					.byte 0, 8, 4, 12, 2, 10, 6, 14
+					.byte 1, 9, 5, 13, 3, 11, 7, 15
+
+shiftsy
+					.byte 0, 8, 4, 12, 2, 10, 6, 14
 					.byte 1, 9, 5, 13, 3, 11, 7, 15
 
 ; ----------------------------------------------------------------------------------------------------
