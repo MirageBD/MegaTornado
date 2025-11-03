@@ -1,6 +1,7 @@
 .define emptychar		$ff80							; size = 64
 
-.define screen1			$b000
+.define screen0			$b000
+.define screen1			$e000
 
 .define palette			$c000
 
@@ -17,6 +18,8 @@
 .define xfrom			$0d
 
 .define shift			$0e
+
+.define flipflop		$0f
 
 ; ----------------------------------------------------------------------------------------------------
 
@@ -139,8 +142,8 @@ entry_main
 		sta $d04c
 
 		DMA_RUN_JOB clearcolorramjob
-		DMA_RUN_JOB clearbitmapjob
-		DMA_RUN_JOB clearscreenjob
+		DMA_RUN_JOB clearbitmap0job
+		DMA_RUN_JOB clearbitmap1job
 
 		; pal y border start
 		lda #<104
@@ -163,13 +166,13 @@ pal		lda verticalcenter+0
 		lda verticalcenter+1
 		tsb $d049
 
-		lda #<.loword(screen1)							; set pointer to screen ram
+		lda #<.loword(screen0)							; set pointer to screen ram
 		sta $d060
-		lda #>.loword(screen1)
+		lda #>.loword(screen0)
 		sta $d061
-		lda #<.hiword(screen1)
+		lda #<.hiword(screen0)
 		sta $d062
-		lda #>.hiword(screen1)
+		lda #>.hiword(screen0)
 		sta $d063
 
 		lda #$00
@@ -179,8 +182,8 @@ pal		lda verticalcenter+0
 		ldx #<(screenchars0 / 64 + 2*32)
 		ldy #>(screenchars0 / 64 + 2*32)
 
-put10	stx screen1+0
-put11	sty screen1+1
+put10	stx screen0+0
+put11	sty screen0+1
 
 		clc
 		txa
@@ -219,7 +222,7 @@ put11	sty screen1+1
 		cmp #28*2
 		beq endscreenplot1
 
-		lda #>screen1
+		lda #>screen0
 		sta put10+2
 		sta put11+2
 		clc
@@ -231,6 +234,66 @@ put11	sty screen1+1
 		jmp put10
 
 endscreenplot1
+
+		lda #$00
+		sta screenrow
+		sta screencolumn
+
+		ldx #<(screenchars1 / 64 + 2*32)
+		ldy #>(screenchars1 / 64 + 2*32)
+
+put20	stx screen1+0
+put21	sty screen1+1
+
+		clc
+		txa
+		adc #$01
+		tax
+		tya
+		adc #$00
+		tay
+
+		clc
+		lda put20+1
+		adc #80
+		sta put20+1
+		lda put20+2
+		adc #0
+		sta put20+2
+
+		clc
+		lda put21+1
+		adc #80
+		sta put21+1
+		lda put21+2
+		adc #0
+		sta put21+2
+
+		inc screenrow
+		lda screenrow
+		cmp #32
+		bne put20
+
+		lda #0
+		sta screenrow
+		inc screencolumn
+		inc screencolumn
+		lda screencolumn
+		cmp #28*2
+		beq endscreenplot2
+
+		lda #>screen1
+		sta put20+2
+		sta put21+2
+		clc
+		lda screencolumn
+		sta put20+1
+		adc #$01
+		sta put21+1
+
+		jmp put20
+
+endscreenplot2
 
 		lda #$55 ; #$55									; CHRXSCL - we want to scale 240 up to 320 and the default value of xscale is 120 (why not 128?), so (120*(240/320) = 90)
 		sta $d05a
@@ -265,6 +328,9 @@ endscreenplot1
 		inx
 		bne :-
 
+		lda #255
+		sta flipflop
+
 		lda $d070
 		and #%11001111									; clear bits 4 and 5 (BTPALSEL) so bitmap uses palette 0
 		sta $d070
@@ -278,7 +344,7 @@ endscreenplot1
 		lda #$00										; disable IRQ raster interrupts because C65 uses raster interrupts in the ROM
 		sta $d01a
 
-		lda #$20										; setup IRQ interrupt
+		lda #$1e										; setup IRQ interrupt
 		sta $d012
 		lda #<irq1
 		sta $fffe
@@ -299,14 +365,10 @@ loop
 .align 256
 
 .macro plotpixel offset, coladd
-		lda #<.loword(screenchars0 + offset)
+		lda #<.loword(offset)
 		sta zp0+0
-		lda #>.loword(screenchars0 + offset)
+		lda #>.loword(offset)
 		sta zp0+1
-		lda #<.hiword(screenchars0 + offset)
-		sta zp0+2
-		lda #>.hiword(screenchars0 + offset)
-		sta zp0+3
 
 		ldz #$00
 		lda plotcol
@@ -320,6 +382,45 @@ irq1
 
 		lda #$10
 		sta $d020
+
+		lda #0
+		sta zp0+3
+
+		lda flipflop
+		eor #255
+		sta flipflop
+
+		bne doublebuffer1
+doublebuffer0:
+		lda #<.hiword(screenchars1)						; render to screen 1
+		sta to+2
+		lda #<.hiword(screenchars0)
+		sta zp0+2
+		sta from+2
+		lda #<.loword(screen0)							; show screen 0
+		sta $d060
+		lda #>.loword(screen0)
+		sta $d061
+		lda #<.hiword(screen0)
+		sta $d062
+		lda #>.hiword(screen0)
+		sta $d063
+		bra doublebufferend
+doublebuffer1:
+		lda #<.hiword(screenchars0)						; render to screen 0
+		sta to+2
+		lda #<.hiword(screenchars1)
+		sta zp0+2
+		sta from+2
+		lda #<.loword(screen1)							; show screen 1
+		sta $d060
+		lda #>.loword(screen1)
+		sta $d061
+		lda #<.hiword(screen1)
+		sta $d062
+		lda #>.hiword(screen1)
+		sta $d063
+doublebufferend:
 
 		jsr peppitoPlay
 
@@ -339,8 +440,8 @@ irq1
 		inc plotcol
 :
 
-		lda #$08
-		sta $d020
+		;lda #$08
+		;sta $d020
 
 		lda frame
 		and #%00001111
@@ -482,11 +583,6 @@ to_not_crossed
 			jmp yloop
 :			
 
-		lda #$15
-		sta $d020
-
-		DMA_RUN_JOB copybufferjob
-
 		lda #$00
 		sta $d020
 
@@ -579,76 +675,7 @@ clearcolorramjob
 
 ; -------------------------------------------------------------------------------------------------
 
-clearscreenjob
-				.byte $0a										; Request format (f018a = 11 bytes (Command MSB is $00), f018b is 12 bytes (Extra Command MSB))
-				.byte $80, $00									; source megabyte   ($0000000 >> 20) ($00 is  chip ram)
-				.byte $81, (screen1 >> 20)						; dest megabyte   ($0000000 >> 20) ($00 is  chip ram)
-				.byte $84, $00									; Destination skip rate (256ths of bytes)
-				.byte $85, $02									; Destination skip rate (whole bytes)
-
-				.byte $00										; No more options
-
-																; 11 byte DMA List structure starts here
-				.byte %00000111									; Command LSB
-																;     0–1 DMA Operation Type (Only Copy and Fill implemented at the time of writing)
-																;             %00 = Copy
-																;             %01 = Mix (via MINTERMs)
-																;             %10 = Swap
-																;             %11 = Fill
-																;       2 Chain (i.e., another DMA list follows)
-																;       3 Yield to interrupts
-																;       4 MINTERM -SA,-DA bit
-																;       5 MINTERM -SA, DA bit
-																;       6 MINTERM  SA,-DA bit
-																;       7 MINTERM  SA, DA bit
-
-				.word 40*36										; Count LSB + Count MSB
-
-				.word <(emptychar/64)							; this is normally the source addres, but contains the fill value now
-				.byte $00										; source bank (ignored)
-
-				.word ((screen1) & $ffff)						; Destination Address LSB + Destination Address MSB
-				.byte (((screen1) >> 16) & $0f)					; Destination Address BANK and FLAGS (copy to rbBaseMem)
-																;     0–3 Memory BANK within the selected MB (0-15)
-																;       4 HOLD,      i.e., do not change the address
-																;       5 MODULO,    i.e., apply the MODULO field to wraparound within a limited memory space
-																;       6 DIRECTION. If set, then the address is decremented instead of incremented.
-																;       7 I/O.       If set, then I/O registers are visible during the DMA controller at $D000 – $DFFF.
-
-				.word $0000
-
-				.byte $00										; No more options
-				.byte %00000011									; Command LSB
-																;     0–1 DMA Operation Type (Only Copy and Fill implemented at the time of writing)
-																;             %00 = Copy
-																;             %01 = Mix (via MINTERMs)
-																;             %10 = Swap
-																;             %11 = Fill
-																;       2 Chain (i.e., another DMA list follows)
-																;       3 Yield to interrupts
-																;       4 MINTERM -SA,-DA bit
-																;       5 MINTERM -SA, DA bit
-																;       6 MINTERM  SA,-DA bit
-																;       7 MINTERM  SA, DA bit
-
-				.word 40*36										; Count LSB + Count MSB
-
-				.word >(emptychar/64)							; this is normally the source addres, but contains the fill value now
-				.byte $00										; source bank (ignored)
-
-				.word ((screen1)+1) & $ffff						; Destination Address LSB + Destination Address MSB
-				.byte ((((screen1)+1) >> 16) & $0f)				; Destination Address BANK and FLAGS (copy to rbBaseMem)
-																;     0–3 Memory BANK within the selected MB (0-15)
-																;       4 HOLD,      i.e., do not change the address
-																;       5 MODULO,    i.e., apply the MODULO field to wraparound within a limited memory space
-																;       6 DIRECTION. If set, then the address is decremented instead of incremented.
-																;       7 I/O.       If set, then I/O registers are visible during the DMA controller at $D000 – $DFFF.
-
-				.word $0000
-
-; -------------------------------------------------------------------------------------------------
-
-clearbitmapjob
+clearbitmap0job:
 				.byte $0a										; Request format (f018a = 11 bytes (Command MSB is $00), f018b is 12 bytes (Extra Command MSB))
 				.byte $81, (screenchars0 >> 20)					; dest megabyte   ($0000000 >> 20) ($00 is  chip ram)
 				;.byte $84, $00									; Destination skip rate (256ths of bytes)
@@ -674,33 +701,29 @@ clearbitmapjob
 
 				.word $0000
 
-; -------------------------------------------------------------------------------------------------
+clearbitmap1job:
+				.byte $0a										; Request format (f018a = 11 bytes (Command MSB is $00), f018b is 12 bytes (Extra Command MSB))
+				.byte $81, (screenchars1 >> 20)					; dest megabyte   ($0000000 >> 20) ($00 is  chip ram)
+				;.byte $84, $00									; Destination skip rate (256ths of bytes)
+				;.byte $85, $01									; Destination skip rate (whole bytes)
 
-copybufferjob
-				;DMA_HEADER $20000 >> 20, $30000 >> 20
-				; f018a = 11 bytes, f018b is 12 bytes
-				.byte $06								; Disable use of transparent value
-				;.byte $07								; Enable use of transparent value
-				.byte $0a ; Request format is F018A
-				.byte $80, (screenchars1 >> 20) ; sourcebank
-				.byte $81, (screenchars0 >> 20) ; destbank
+				.byte $00										; No more options
 
-				.byte $82, 0 ; Source skip rate (256ths of bytes)
-				.byte $83, 1 ; Source skip rate (whole bytes)
+																; 11 byte DMA List structure starts here
+				.byte %00000011									; fill and don't chain
 
-				.byte $84, 0 ; Destination skip rate (256ths of bytes)
-				.byte $85, 1 ; Destination skip rate (whole bytes)
+				.word 0 ; 240*256								; Count LSB + Count MSB
 
-				.byte $00 ; No more options
+				.word $0020										; this is normally the source addres, but contains the fill value now
+				.byte $00										; source bank (ignored)
 
-				.byte $00 ; Copy and last request
-				.word 240*256 ; 32*32*64-1 ; Size of Copy
-
-				.word screenchars1 & $ffff
-				.byte (screenchars1 >> 16)
-
-				.word screenchars0 & $ffff
-				.byte ((screenchars0 >> 16) & $0f)
+				.word $0000										; Destination Address LSB + Destination Address MSB
+				.byte ((screenchars1 >> 16) & $0f)				; Destination Address BANK and FLAGS (copy to rbBaseMem)
+																;     0–3 Memory BANK within the selected MB (0-15)
+																;       4 HOLD,      i.e., do not change the address
+																;       5 MODULO,    i.e., apply the MODULO field to wraparound within a limited memory space
+																;       6 DIRECTION. If set, then the address is decremented instead of incremented.
+																;       7 I/O.       If set, then I/O registers are visible during the DMA controller at $D000 – $DFFF.
 
 				.word $0000
 
