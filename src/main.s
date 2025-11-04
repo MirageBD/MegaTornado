@@ -418,14 +418,14 @@ doublebufferend:
 
 		plotcolourpixel ((16-1)*(256*8)+16*64-2-8),  0
 		plotcolourpixel ((16-1)*(256*8)+16*64-2-0),  0
-		plotcolourpixel ((16-1)*(256*8)+16*64-2+8),  0
+		plotcolourpixel ((16-1)*(256*8)+16*64-2+8),  1
 
 		plotcolourpixel ((16-1)*(256*8)+16*64-1-8),  0
 		plotcolourpixel ((16-1)*(256*8)+16*64-1-0),  1
 		plotcolourpixel ((16-1)*(256*8)+16*64-1+8),  1
 
 		plotcolourpixel ((16+0)*(256*8)+16*64+0-16), 0
-		plotcolourpixel ((16+0)*(256*8)+16*64+0-8),  1
+		plotcolourpixel ((16+0)*(256*8)+16*64+0-8),  0
 		plotcolourpixel ((16+0)*(256*8)+16*64+0-0),  1
 
 		lda frame
@@ -592,7 +592,7 @@ exit_xloop:
 		sta $c000
 :		
 
-		;jsr peppitoPlay
+		jsr peppitoPlay
 
 		;DMA_RUN_JOB clearbitmap0checkeredjob
 		;DMA_RUN_JOB clearbitmap1checkeredjob
