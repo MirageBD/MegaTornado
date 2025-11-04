@@ -410,9 +410,9 @@ doublebuffer1:
 		sta $d063
 doublebufferend:
 
-		;lda frame
-		;and #%00000000
-		;bne :+
+		lda frame
+		and #%00000001
+		bne :+
 		inc plotcol
 :
 
