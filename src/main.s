@@ -463,23 +463,23 @@ yloop
 
 				;clc
 				;lda xto
-				and #$07
+				and #%00000111
 				adc yto+0
 				sta to+0
 
 				lda xto
-				and #(256-8)
+				and #%11111000
 				adc yto+1
 				sta to+1
 
 				;clc
 				lda xfrom
-				and #$07
+				and #%00000111
 				adc yfrom+0
 				sta from+0
 
 				lda xfrom
-				and #(256-8)
+				and #%11111000
 				adc yfrom+1
 				sta from+1
 
@@ -517,7 +517,7 @@ to					.word $0000										; dst
 					bne from_not_crossed_hi
 					inc from+1
 from_not_crossed_hi	;clc
-					adc #<(((256/8)*64)-8)			; add $07f8
+					adc #<(((256/8)*64)-8)			; add $0800-8 (32 char * 64 pixels per char)
 					sta from+0
 					lda from+1
 					adc #>(((256/8)*64)-8)
@@ -526,7 +526,7 @@ from_not_crossed
 
 					lda to+0
 					and #7
-					bne to_not_crossed
+					bne zloop; to_not_crossed
 ;to_crossed
 					lda to+0
 					bne to_not_crossed_hi
@@ -571,7 +571,7 @@ exit_yloop:
 
 			;clc
 			lda yto+0
-			adc #128
+			adc #128				; add 2*64 to get to next row, 2 characters below this one
 			sta yto+0
 			lda yto+1
 			adc #0
@@ -583,6 +583,14 @@ exit_xloop:
 
 		lda #$10
 		sta $d020
+
+		clc
+		lda $d012
+		cmp maxd012
+		bcc :+
+		sta maxd012
+		sta $c000
+:		
 
 		;jsr peppitoPlay
 
@@ -603,6 +611,8 @@ screencolumn		.byte 0
 verticalcenter		.byte 0
 
 plotcol				.byte 0
+
+maxd012				.byte 0
 
 shiftsx
 					.byte 0, 8, 4, 12, 2, 10, 6, 14
@@ -686,8 +696,8 @@ clearcolorramjob
 clearbitmap0job:
 				.byte $0a										; Request format (f018a = 11 bytes (Command MSB is $00), f018b is 12 bytes (Extra Command MSB))
 				.byte $81, (screenchars0 >> 20)					; dest megabyte   ($0000000 >> 20) ($00 is  chip ram)
-				;.byte $84, $00									; Destination skip rate (256ths of bytes)
-				;.byte $85, $01									; Destination skip rate (whole bytes)
+				.byte $84, $00									; Destination skip rate (256ths of bytes)
+				.byte $85, $01									; Destination skip rate (whole bytes)
 
 				.byte $00										; No more options
 
@@ -712,8 +722,8 @@ clearbitmap0job:
 clearbitmap1job:
 				.byte $0a										; Request format (f018a = 11 bytes (Command MSB is $00), f018b is 12 bytes (Extra Command MSB))
 				.byte $81, (screenchars1 >> 20)					; dest megabyte   ($0000000 >> 20) ($00 is  chip ram)
-				;.byte $84, $00									; Destination skip rate (256ths of bytes)
-				;.byte $85, $01									; Destination skip rate (whole bytes)
+				.byte $84, $00									; Destination skip rate (256ths of bytes)
+				.byte $85, $01									; Destination skip rate (whole bytes)
 
 				.byte $00										; No more options
 
