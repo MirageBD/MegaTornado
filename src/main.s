@@ -352,7 +352,7 @@ endscreenplot
 
 .align 256
 
-.macro plotpixel offset, coladd
+.macro plotcolourpixel offset, coladd
 		lda #<.loword(offset)
 		sta zp0+0
 		lda #>.loword(offset)
@@ -410,26 +410,23 @@ doublebuffer1:
 		sta $d063
 doublebufferend:
 
-		plotpixel ((16-1)*(256*8)+16*64-2-8),  0
-		plotpixel ((16-1)*(256*8)+16*64-2-0),  0
-		plotpixel ((16-1)*(256*8)+16*64-2+8),  0
-
-		plotpixel ((16-1)*(256*8)+16*64-1-8),  0
-		plotpixel ((16-1)*(256*8)+16*64-1-0),  1
-		plotpixel ((16-1)*(256*8)+16*64-1+8),  1
-
-		plotpixel ((16+0)*(256*8)+16*64+0-16), 0
-		plotpixel ((16+0)*(256*8)+16*64+0-8),  1
-		plotpixel ((16+0)*(256*8)+16*64+0-0),  1
-
-		lda frame
-		and #%00000001
-		bne :+
+		;lda frame
+		;and #%00000000
+		;bne :+
 		inc plotcol
 :
 
-		;lda #$08
-		;sta $d020
+		plotcolourpixel ((16-1)*(256*8)+16*64-2-8),  0
+		plotcolourpixel ((16-1)*(256*8)+16*64-2-0),  0
+		plotcolourpixel ((16-1)*(256*8)+16*64-2+8),  0
+
+		plotcolourpixel ((16-1)*(256*8)+16*64-1-8),  0
+		plotcolourpixel ((16-1)*(256*8)+16*64-1-0),  1
+		plotcolourpixel ((16-1)*(256*8)+16*64-1+8),  1
+
+		plotcolourpixel ((16+0)*(256*8)+16*64+0-16), 0
+		plotcolourpixel ((16+0)*(256*8)+16*64+0-8),  1
+		plotcolourpixel ((16+0)*(256*8)+16*64+0-0),  1
 
 		lda frame
 		and #%00001111
@@ -448,21 +445,24 @@ doublebufferend:
 		sta yto+1
 		sta yfrom+1
 
-		ldy #14
+		lda #$1c
+		sta $d020
 
-yloop		lda shiftx					; get shift again but assign to xfrom/to
-			sta xto
-			sta xfrom
-			tya
+		ldx #14							; loop x 15 times
+
+xloop		
 			;clc
-			adc xfrom
+			txa
+			adc shiftx
 			sta xfrom
+			lda shiftx					; get shift again but assign to xfrom/to
+			sta xto
 
-			ldx #14
-xloop
+			ldy #14						; loop y 15 times
+yloop
 
 				;clc
-				lda xto
+				;lda xto
 				and #$07
 				adc yto+0
 				sta to+0
@@ -483,12 +483,10 @@ xloop
 				adc yfrom+1
 				sta from+1
 
-				lda $d020
-				eor #$ff
-				sta $d020
-
 				ldz #16
 zloop:
+					;inc $d020
+
 					sta $d707										; inline DMA copy
 					;.byte $06										; Disable use of transparent value
 					;.byte $07										; Enable use of transparent value					;.byte $82, $00									; Source skip rate (256ths of bytes)
@@ -544,15 +542,6 @@ to_not_crossed
 
 exit_zloop:
 
-				lda $d020
-				eor #$ff
-				sta $d020
-			
-				;clc
-				lda xto
-				adc #16
-				sta xto
-
 				;clc
 				lda xfrom
 				adc #15							; was 16, but I was subtracting one again afterwards
@@ -566,14 +555,19 @@ exit_zloop:
 				adc #$00
 				sta yfrom+1
 				
-				dex
-				bmi exit_xloop
-				jmp xloop
+				;clc
+				lda xto
+				adc #16
+				sta xto
 
-exit_xloop:
+				dey
+				bmi exit_yloop
+				jmp yloop
 
-			dey
-			bmi exit_yloop
+exit_yloop:
+
+			dex
+			bmi exit_xloop
 
 			;clc
 			lda yto+0
@@ -583,20 +577,17 @@ exit_xloop:
 			adc #0
 			sta yto+1
 
-			jmp yloop
+			jmp xloop
 
-exit_yloop:			
+exit_xloop:
 
-		lda #$94
+		lda #$10
 		sta $d020
 
-		jsr peppitoPlay
+		;jsr peppitoPlay
 
 		;DMA_RUN_JOB clearbitmap0checkeredjob
 		;DMA_RUN_JOB clearbitmap1checkeredjob
-
-		lda #$84
-		sta $d020
 
 		inc frame
 
