@@ -352,28 +352,58 @@ endscreenplot
 
 .align 256
 
-DAToffsetx	.word 0
-DAToffsety	.byte 0
-DATtemp		.word 0
-DATaddress	.word 0
+.macro PLOTCOLOURPIXEL offsetx, offsety, coladd
+		ldx #offsetx
+		ldy #offsety
+		lda #coladd
+		sta plotcoladd
 
-.macro plotcolourpixel offsetx, offsety, coladd
+		jsr plotcolourpixel
+.endmacro
+
+plotcolourpixel
 		;lda #<.loword((offsetx/8) * (256*8) + (offsetx & 7) + offsety * 8)
 		;sta zp0+0
 		;lda #>.loword((offsetx/8) * (256*8) + (offsetx & 7) + offsety * 8)
 		;sta zp0+1
 
-		lda #((offsetx & %00000111) + (offsety<<3)) ; multiply offsety by 8
+		;lda #((offsetx & %00000111) + (offsety<<3)) ; multiply offsety by 8
+		;sta zp0+0
+		;lda #((offsetx & %11111000) + (offsety>>5)) ; divide offsety by 32
+		;sta zp0+1
+
+		clc
+		tya
+		asl
+		asl
+		asl
 		sta zp0+0
-		lda #((offsetx & %11111000) + (offsety>>5)) ; divide offsety by 32
+		txa
+		and #%00000111
+		ora zp0+0
+		sta zp0+0
+		
+		clc
+		tya
+		lsr
+		lsr
+		lsr
+		lsr
+		lsr
+		sta zp0+1
+		txa
+		and #%11111000
+		ora zp0+1
 		sta zp0+1
 
 		ldz #$00
 		lda plotcol
 		clc
-		adc coladd
+		adc plotcoladd
 		sta [zp0],z
-.endmacro
+		rts
+
+; ----------------------------------------------------------------------------------------------------		
 
 irq1
 		pha
@@ -426,17 +456,17 @@ doublebufferend:
 		inc plotcol
 :
 
-		plotcolourpixel 126, 126, 0
-		plotcolourpixel 127, 126, 0
-		plotcolourpixel 128, 126, 0
+		PLOTCOLOURPIXEL 126, 126, 0
+		PLOTCOLOURPIXEL 127, 126, 8
+		PLOTCOLOURPIXEL 128, 126, 16
 
-		plotcolourpixel 126, 127, 0
-		plotcolourpixel 127, 127, 1
-		plotcolourpixel 128, 127, 0
+		PLOTCOLOURPIXEL 126, 127, 0
+		PLOTCOLOURPIXEL 127, 127, 8
+		PLOTCOLOURPIXEL 128, 127, 16
 
-		plotcolourpixel 126, 128, 1
-		plotcolourpixel 127, 128, 1
-		plotcolourpixel 128, 128, 1
+		PLOTCOLOURPIXEL 126, 128, 0
+		PLOTCOLOURPIXEL 127, 128, 8
+		PLOTCOLOURPIXEL 128, 128, 16
 
 		;jmp endirq
 
@@ -626,6 +656,7 @@ screencolumn		.byte 0
 verticalcenter		.byte 0
 
 plotcol				.byte 0
+plotcoladd			.byte 0
 
 maxd012				.byte 0
 
