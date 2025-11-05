@@ -352,10 +352,20 @@ endscreenplot
 
 .align 256
 
-.macro plotcolourpixel offset, coladd
-		lda #<.loword(offset)
+DAToffsetx	.word 0
+DAToffsety	.byte 0
+DATtemp		.word 0
+DATaddress	.word 0
+
+.macro plotcolourpixel offsetx, offsety, coladd
+		;lda #<.loword((offsetx/8) * (256*8) + (offsetx & 7) + offsety * 8)
+		;sta zp0+0
+		;lda #>.loword((offsetx/8) * (256*8) + (offsetx & 7) + offsety * 8)
+		;sta zp0+1
+
+		lda #((offsetx & %00000111) + (offsety<<3)) ; multiply offsety by 8
 		sta zp0+0
-		lda #>.loword(offset)
+		lda #((offsetx & %11111000) + (offsety>>5)) ; divide offsety by 32
 		sta zp0+1
 
 		ldz #$00
@@ -416,25 +426,27 @@ doublebufferend:
 		inc plotcol
 :
 
-		plotcolourpixel ((16-1)*(256*8)+16*64-2-8),  0
-		plotcolourpixel ((16-1)*(256*8)+16*64-2-0),  0
-		plotcolourpixel ((16-1)*(256*8)+16*64-2+8),  1
+		plotcolourpixel 126, 126, 0
+		plotcolourpixel 127, 126, 0
+		plotcolourpixel 128, 126, 0
 
-		plotcolourpixel ((16-1)*(256*8)+16*64-1-8),  0
-		plotcolourpixel ((16-1)*(256*8)+16*64-1-0),  1
-		plotcolourpixel ((16-1)*(256*8)+16*64-1+8),  1
+		plotcolourpixel 126, 127, 0
+		plotcolourpixel 127, 127, 1
+		plotcolourpixel 128, 127, 0
 
-		plotcolourpixel ((16+0)*(256*8)+16*64+0-16), 0
-		plotcolourpixel ((16+0)*(256*8)+16*64+0-8),  0
-		plotcolourpixel ((16+0)*(256*8)+16*64+0-0),  1
+		plotcolourpixel 126, 128, 1
+		plotcolourpixel 127, 128, 1
+		plotcolourpixel 128, 128, 1
+
+		;jmp endirq
 
 		lda frame
 		and #%00001111
 		tax
-		lda shiftsx,x
+		lda shifts,x
 		sta shiftx
 
-		lda shiftsy,x
+		lda shifts,x
 		asl								; multiply shift by 8 to get yshift
 		asl
 		asl
@@ -538,6 +550,7 @@ to_not_crossed_hi	;clc
 					adc #>(((256/8)*64)-8)
 					sta to+1
 to_not_crossed
+
 					bra zloop
 
 exit_zloop:
@@ -597,6 +610,8 @@ exit_xloop:
 		;DMA_RUN_JOB clearbitmap0checkeredjob
 		;DMA_RUN_JOB clearbitmap1checkeredjob
 
+endirq:
+
 		inc frame
 
 		pla
@@ -614,11 +629,7 @@ plotcol				.byte 0
 
 maxd012				.byte 0
 
-shiftsx
-					.byte 0, 8, 4, 12, 2, 10, 6, 14
-					.byte 1, 9, 5, 13, 3, 11, 7, 15
-
-shiftsy
+shifts
 					.byte 0, 8, 4, 12, 2, 10, 6, 14
 					.byte 1, 9, 5, 13, 3, 11, 7, 15
 
@@ -722,6 +733,8 @@ clearbitmap0job:
 clearbitmap1job:
 				.byte $0a										; Request format (f018a = 11 bytes (Command MSB is $00), f018b is 12 bytes (Extra Command MSB))
 				.byte $81, (screenchars1 >> 20)					; dest megabyte   ($0000000 >> 20) ($00 is  chip ram)
+				.byte $82, $00									; Source skip rate (256ths of bytes)
+				.byte $83, $01									; Source skip rate (whole bytes)
 				.byte $84, $00									; Destination skip rate (256ths of bytes)
 				.byte $85, $01									; Destination skip rate (whole bytes)
 
