@@ -1,11 +1,11 @@
 MEMORY
 {
-	RAM:			start=$2100, size=$50000;
+	RAM:			start=$2100, size=$60000;
 }
 
 SEGMENTS
 {
 	MAIN:			load=RAM, start=$2100;
 	PALETTE:		load=RAM, start=$c000;
-	SONG:			load=RAM, start=$30000;
+	SONG:			load=RAM, start=$50000;
 }

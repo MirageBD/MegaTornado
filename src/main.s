@@ -7,11 +7,10 @@
 
 .define screenchars0		$10000
 .define screenchars1		$20000
+.define screenchars2		$10000
+.define screenchars3		$20000
 
-.define screenchars0div64	screenchars0/64
-.define screenchars1div64	screenchars1/64
-
-.define moddata				$30000
+.define moddata				$50000
 
 .define zp0					$04								; size = 4
 
@@ -28,7 +27,8 @@
 .define MULTINB				$d774
 .define MULTOUT				$d778
 
-.define CHARSPERROW			64*2
+; 2*28+1
+.define CHARSPERROW			57*2
 
 ; ----------------------------------------------------------------------------------------------------
 
@@ -153,6 +153,8 @@ entry_main
 		DMA_RUN_JOB clearcolorramjob
 		DMA_RUN_JOB clearbitmap0job
 		DMA_RUN_JOB clearbitmap1job
+		DMA_RUN_JOB clearbitmap2job
+		DMA_RUN_JOB clearbitmap3job
 
 		; pal y border start
 		lda #<104
@@ -186,16 +188,68 @@ pal		lda verticalcenter+0
 
 
 
-
+		; screen 1 'left'
 		ldx #<(screenchars0 / 64 + 2*32 + 2)				; add two columns and 2 rows
 		ldy #>(screenchars0 / 64 + 2*32 + 2)
-		lda #>screen0
+		lda #>screen0	; high byte destination
+		ldz #0			; low byte destination
 		jsr setuptextscreen
 
+		; screen 1 'right'
+		ldx #<(screenchars2 / 64 + 2*32 + 2)				; add two columns and 2 rows
+		ldy #>(screenchars2 / 64 + 2*32 + 2)
+		lda #>screen0	; high byte destination
+		ldz #2*28+2		; low byte destination (+1 for gotox)
+		jsr setuptextscreen
+
+
+		; screen 2 'left'
 		ldx #<(screenchars1 / 64 + 2*32 + 2)
 		ldy #>(screenchars1 / 64 + 2*32 + 2)
-		lda #>screen1
+		lda #>screen1	; high byte destination
+		ldz #0			; low byte destination
 		jsr setuptextscreen
+
+		; screen 2 'right'
+		ldx #<(screenchars3 / 64 + 2*32 + 2)				; add two columns and 2 rows
+		ldy #>(screenchars3 / 64 + 2*32 + 2)
+		lda #>screen1	; high byte destination
+		ldz #2*28+2		; low byte destination (+1 for gotox)
+		jsr setuptextscreen
+
+
+
+
+		; set colour ram to gotox and transparency
+		ldx #0
+		lda #<.loword(SAFE_COLOR_RAM)
+		sta zp0+0
+		lda #>.loword(SAFE_COLOR_RAM)
+		sta zp0+1
+		lda #<.hiword(SAFE_COLOR_RAM)
+		sta zp0+2
+		lda #>.hiword(SAFE_COLOR_RAM)
+		sta zp0+3
+gotoxloop:
+		lda #%10010000
+		ldz #28*2
+		sta [zp0],z
+		clc
+		lda zp0+0
+		adc #CHARSPERROW
+		sta zp0+0
+		lda zp0+1
+		adc #0
+		sta zp0+1
+		inx
+		cpx #28
+		bne gotoxloop
+		; set new gotox position in screen ram 0 and 1
+		; WE'RE PRESUMING IT'S ALREADY 0 - DANGEROUS, BUT I'M LAZY!
+
+
+
+
 
 
 
@@ -278,13 +332,14 @@ loop
 
 setuptextscreen:
 
+		stz put10+1
+		stz put12+1
+		inz
+		stz put11+1
+
 		sta put10+2
 		sta put11+2
-		sta put12+1
-		lda #0
-		sta put10+1
-		lda #1
-		sta put11+1
+		sta put13+1
 
 		lda #txtstartrow
 		sta screenrow
@@ -328,13 +383,20 @@ put11	sty screen0+1
 
 		; calculate new start position here
 
-put12	lda #>screen0									; reset the destination high byte
+put12	ldz #0
+		stz put10+1
+		inz
+		stz put11+1
+put13	lda #>screen0									; reset the destination high byte
 		sta put10+2
 		sta put11+2
+
 		clc
-		lda screencolumn
+		lda put10+1
+		adc screencolumn
 		sta put10+1
-		adc #$01
+		lda put11+1
+		adc screencolumn
 		sta put11+1
 
 		clc												; add remainder to character address
@@ -959,6 +1021,62 @@ clearbitmap1job:
 
 				.word $0000										; Destination Address LSB + Destination Address MSB
 				.byte ((screenchars1 >> 16) & $0f)				; Destination Address BANK and FLAGS (copy to rbBaseMem)
+																;     0–3 Memory BANK within the selected MB (0-15)
+																;       4 HOLD,      i.e., do not change the address
+																;       5 MODULO,    i.e., apply the MODULO field to wraparound within a limited memory space
+																;       6 DIRECTION. If set, then the address is decremented instead of incremented.
+																;       7 I/O.       If set, then I/O registers are visible during the DMA controller at $D000 – $DFFF.
+
+				.word $0000
+
+clearbitmap2job:
+				.byte $0a										; Request format (f018a = 11 bytes (Command MSB is $00), f018b is 12 bytes (Extra Command MSB))
+				.byte $81, (screenchars2 >> 20)					; dest megabyte   ($0000000 >> 20) ($00 is  chip ram)
+				.byte $82, $00									; Source skip rate (256ths of bytes)
+				.byte $83, $01									; Source skip rate (whole bytes)
+				.byte $84, $00									; Destination skip rate (256ths of bytes)
+				.byte $85, $02									; Destination skip rate (whole bytes)
+
+				.byte $00										; No more options
+
+																; 11 byte DMA List structure starts here
+				.byte %00000011									; fill and don't chain
+
+				.word 0 ; 240*256								; Count LSB + Count MSB
+
+				.word $0001										; this is normally the source addres, but contains the fill value now
+				.byte $00										; source bank (ignored)
+
+				.word $0000										; Destination Address LSB + Destination Address MSB
+				.byte ((screenchars2 >> 16) & $0f)				; Destination Address BANK and FLAGS (copy to rbBaseMem)
+																;     0–3 Memory BANK within the selected MB (0-15)
+																;       4 HOLD,      i.e., do not change the address
+																;       5 MODULO,    i.e., apply the MODULO field to wraparound within a limited memory space
+																;       6 DIRECTION. If set, then the address is decremented instead of incremented.
+																;       7 I/O.       If set, then I/O registers are visible during the DMA controller at $D000 – $DFFF.
+
+				.word $0000
+
+clearbitmap3job:
+				.byte $0a										; Request format (f018a = 11 bytes (Command MSB is $00), f018b is 12 bytes (Extra Command MSB))
+				.byte $81, (screenchars3 >> 20)					; dest megabyte   ($0000000 >> 20) ($00 is  chip ram)
+				.byte $82, $00									; Source skip rate (256ths of bytes)
+				.byte $83, $01									; Source skip rate (whole bytes)
+				.byte $84, $00									; Destination skip rate (256ths of bytes)
+				.byte $85, $02									; Destination skip rate (whole bytes)
+
+				.byte $00										; No more options
+
+																; 11 byte DMA List structure starts here
+				.byte %00000011									; fill and don't chain
+
+				.word 0 ; 240*256								; Count LSB + Count MSB
+
+				.word $0001										; this is normally the source addres, but contains the fill value now
+				.byte $00										; source bank (ignored)
+
+				.word $0000										; Destination Address LSB + Destination Address MSB
+				.byte ((screenchars2 >> 16) & $0f)				; Destination Address BANK and FLAGS (copy to rbBaseMem)
 																;     0–3 Memory BANK within the selected MB (0-15)
 																;       4 HOLD,      i.e., do not change the address
 																;       5 MODULO,    i.e., apply the MODULO field to wraparound within a limited memory space
