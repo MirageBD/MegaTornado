@@ -28,6 +28,8 @@
 .define MULTINB				$d774
 .define MULTOUT				$d778
 
+.define CHARSPERROW			64*2
+
 ; ----------------------------------------------------------------------------------------------------
 
 .segment "PALETTE"
@@ -140,7 +142,7 @@ entry_main
 		lda #%10100000									; Clear bit7=40 column, bit5=disable ...?
 		trb $d031
 
-		lda #40*2										; logical chars per row
+		lda #CHARSPERROW								; logical chars per row
 		sta $d058
 		lda #$00
 		sta $d059
@@ -302,7 +304,7 @@ put11	sty screen0+1
 
 		clc												; and move to next row
 		lda put10+1
-		adc #80
+		adc #CHARSPERROW
 		sta put10+1
 		sta put11+1
 		lda put10+2
@@ -352,16 +354,25 @@ endscreenplot
 
 .align 256
 
+plotx			.byte 0
+ploty			.byte 0
+cursin			.byte 0
+curcos			.byte 0
+tempbyte		.byte 0
+particlecolour	.byte 0
+particlesize	.byte 2
+
 .macro PLOTCOLOURPIXEL offsetx, offsety, coladd
 		ldx #offsetx
 		ldy #offsety
 		lda #coladd
 		sta plotcoladd
 
+		jsr calcplotpixel
 		jsr plotcolourpixel
 .endmacro
 
-plotcolourpixel
+calcplotpixel
 		;lda #<.loword((offsetx/8) * (256*8) + (offsetx & 7) + offsety * 8)
 		;sta zp0+0
 		;lda #>.loword((offsetx/8) * (256*8) + (offsetx & 7) + offsety * 8)
@@ -395,20 +406,71 @@ plotcolourpixel
 		and #%11111000
 		ora zp0+1
 		sta zp0+1
+		rts
+
+plotcolourpixel
 
 		ldz #$00
 		lda plotcol
 		clc
 		adc plotcoladd
+		and #$7f
 		sta [zp0],z
 		rts
 
-; ----------------------------------------------------------------------------------------------------		
+; ----------------------------------------------------------------------------------------------------
+
+drawparticle
+
+		ldy #0
+plotyloop:
+
+		ldx #0
+plotxloop:
+		phy
+		phx
+
+		clc
+		txa
+		adc cursin
+		tax
+
+		clc
+		tya
+		adc curcos
+		tay
+
+		jsr calcplotpixel
+		;txa
+		;sta plotcoladd
+		;jsr plotcolourpixel
+
+		plx
+		ply
+
+		clc
+		txa
+		sta tempbyte
+		tya
+		adc tempbyte
+		adc particlecolour
+		sta [zp0],z
+
+		inx
+		cpx particlesize
+		bne plotxloop
+
+		iny
+		cpy particlesize
+		bne plotyloop
+		rts
+
+; ----------------------------------------------------------------------------------------------------
 
 irq1
 		pha
 
-		lda #$88
+		lda #$08
 		sta $d020
 
 		lda #0
@@ -456,6 +518,122 @@ doublebufferend:
 		inc plotcol
 :
 
+		ldx frame
+		lda sine,x
+		lsr
+		lsr
+		lsr
+		lsr
+		lsr
+		lsr
+		adc #$02
+		sta particlesize
+
+		lda frame
+		eor #255
+		asl
+		tax
+		lda sine,x
+		lsr
+		lsr
+		lsr
+		adc #127-16
+		sta cursin
+
+		lda frame
+		eor #255
+		asl
+		tax
+		lda sine+64,x
+		lsr
+		lsr
+		lsr
+		adc #127-16
+		sta curcos
+
+		lda #$80
+		sta particlecolour
+		jsr drawparticle
+
+		ldx frame
+		lda sine+64,x
+		lsr
+		lsr
+		lsr
+		lsr
+		lsr
+		lsr
+		adc #$04
+		sta particlesize
+
+		lda frame
+		adc #4
+		eor #255
+		asl
+		asl
+		tax
+		lda sine,x
+		lsr
+		lsr
+		lsr
+		adc #127-16
+		sta cursin
+
+		lda frame
+		adc #4
+		eor #255
+		asl
+		tax
+		lda sine+64,x
+		lsr
+		lsr
+		adc #127-32
+		sta curcos
+
+		lda #$90
+		sta particlecolour
+		jsr drawparticle
+
+		lda frame
+		asl
+		asl
+		lda sine+64,x
+		lsr
+		lsr
+		lsr
+		lsr
+		lsr
+		lsr
+		lsr
+		adc #$06
+		sta particlesize
+
+		lda frame
+		adc #4
+		eor #255
+		asl
+		asl
+		tax
+		lda sine+32,x
+		lsr
+		lsr
+		adc #127-32
+		sta cursin
+
+		lda frame
+		adc #4
+		eor #255
+		asl
+		tax
+		lda sine+64,x
+		lsr
+		adc #127-64
+		sta curcos
+
+		lda #$a0
+		sta particlecolour
+		jsr drawparticle
+
 		PLOTCOLOURPIXEL 126, 126, 0
 		PLOTCOLOURPIXEL 127, 126, 8
 		PLOTCOLOURPIXEL 128, 126, 16
@@ -487,8 +665,8 @@ doublebufferend:
 		sta yto+1
 		sta yfrom+1
 
-		lda #$1c
-		sta $d020
+		;lda #$1c
+		;sta $d020
 
 		ldx #14							; loop x 15 times
 
@@ -624,8 +802,8 @@ exit_yloop:
 
 exit_xloop:
 
-		lda #$10
-		sta $d020
+		;lda #$10
+		;sta $d020
 
 		clc
 		lda $d012
@@ -635,7 +813,7 @@ exit_xloop:
 		sta $c000
 :		
 
-		jsr peppitoPlay
+		;jsr peppitoPlay
 
 		;DMA_RUN_JOB clearbitmap0checkeredjob
 		;DMA_RUN_JOB clearbitmap1checkeredjob
@@ -689,7 +867,7 @@ clearcolorramjob
 																;       6 MINTERM  SA,-DA bit
 																;       7 MINTERM  SA, DA bit
 
-				.word 40*36										; Count LSB + Count MSB
+				.word CHARSPERROW*28							; Count LSB + Count MSB
 
 				.word $0007										; this is normally the source addres, but contains the fill value now
 				.byte $00										; source bank (ignored)
@@ -718,7 +896,7 @@ clearcolorramjob
 																;       6 MINTERM  SA,-DA bit
 																;       7 MINTERM  SA, DA bit
 
-				.word 40*36										; Count LSB + Count MSB
+				.word CHARSPERROW*28							; Count LSB + Count MSB
 
 				.word $0000										; this is normally the source addres, but contains the fill value now
 				.byte $00										; source bank (ignored)
@@ -844,3 +1022,24 @@ clearbitmap1checkeredjob:
 				.word $0000
 
 ; -------------------------------------------------------------------------------------------------
+
+		.align 256
+
+sine
+		.byte 255, 254, 254, 254, 254, 254, 253, 253, 252, 251, 251, 250, 249, 248, 247, 246, 245, 244, 242, 241, 240, 238, 236, 235, 233, 231, 230, 228, 226, 224, 222, 219
+		.byte 217, 215, 213, 210, 208, 206, 203, 201, 198, 195, 193, 190, 187, 185, 182, 179, 176, 173, 170, 167, 164, 161, 158, 155, 152, 149, 146, 143, 140, 137, 134, 131
+		.byte 128, 124, 121, 118, 115, 112, 109, 106, 103, 100, 097, 094, 091, 088, 085, 082, 079, 076, 073, 070, 068, 065, 062, 060, 057, 054, 052, 049, 047, 045, 042, 040
+		.byte 038, 036, 033, 031, 029, 027, 025, 024, 022, 020, 019, 017, 015, 014, 013, 011, 010, 009, 008, 007, 006, 005, 004, 004, 003, 002, 002, 001, 001, 001, 001, 001
+		.byte 001, 001, 001, 001, 001, 001, 002, 002, 003, 004, 004, 005, 006, 007, 008, 009, 010, 011, 013, 014, 015, 017, 019, 020, 022, 024, 025, 027, 029, 031, 033, 036
+		.byte 038, 040, 042, 045, 047, 049, 052, 054, 057, 060, 062, 065, 068, 070, 073, 076, 079, 082, 085, 088, 091, 094, 097, 100, 103, 106, 109, 112, 115, 118, 121, 124
+		.byte 127, 131, 134, 137, 140, 143, 146, 149, 152, 155, 158, 161, 164, 167, 170, 173, 176, 179, 182, 185, 187, 190, 193, 195, 198, 201, 203, 206, 208, 210, 213, 215
+		.byte 217, 219, 222, 224, 226, 228, 230, 231, 233, 235, 236, 238, 240, 241, 242, 244, 245, 246, 247, 248, 249, 250, 251, 251, 252, 253, 253, 254, 254, 254, 254, 254
+
+		.byte 254, 254, 254, 254, 254, 254, 253, 253, 252, 251, 251, 250, 249, 248, 247, 246, 245, 244, 242, 241, 240, 238, 236, 235, 233, 231, 230, 228, 226, 224, 222, 219
+		.byte 217, 215, 213, 210, 208, 206, 203, 201, 198, 195, 193, 190, 187, 185, 182, 179, 176, 173, 170, 167, 164, 161, 158, 155, 152, 149, 146, 143, 140, 137, 134, 131
+		.byte 128, 124, 121, 118, 115, 112, 109, 106, 103, 100, 097, 094, 091, 088, 085, 082, 079, 076, 073, 070, 068, 065, 062, 060, 057, 054, 052, 049, 047, 045, 042, 040
+		.byte 038, 036, 033, 031, 029, 027, 025, 024, 022, 020, 019, 017, 015, 014, 013, 011, 010, 009, 008, 007, 006, 005, 004, 004, 003, 002, 002, 001, 001, 001, 001, 001
+		.byte 001, 001, 001, 001, 001, 001, 002, 002, 003, 004, 004, 005, 006, 007, 008, 009, 010, 011, 013, 014, 015, 017, 019, 020, 022, 024, 025, 027, 029, 031, 033, 036
+		.byte 038, 040, 042, 045, 047, 049, 052, 054, 057, 060, 062, 065, 068, 070, 073, 076, 079, 082, 085, 088, 091, 094, 097, 100, 103, 106, 109, 112, 115, 118, 121, 124
+		.byte 127, 131, 134, 137, 140, 143, 146, 149, 152, 155, 158, 161, 164, 167, 170, 173, 176, 179, 182, 185, 187, 190, 193, 195, 198, 201, 203, 206, 208, 210, 213, 215
+		.byte 217, 219, 222, 224, 226, 228, 230, 231, 233, 235, 236, 238, 240, 241, 242, 244, 245, 246, 247, 248, 249, 250, 251, 251, 252, 253, 253, 254, 254, 254, 254, 254
