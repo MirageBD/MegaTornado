@@ -629,10 +629,10 @@ irq1
 		bne doublebuffer1
 doublebuffer0:
 		lda #<.hiword(screenchars1)						; render to screen 1
-		sta to+2
+		sta scr1_to+2
 		lda #<.hiword(screenchars0)
 		sta zp0+2
-		sta from+2
+		sta scr1_from+2
 		lda #<.loword(screen0)							; show screen 0
 		sta $d060
 		lda #>.loword(screen0)
@@ -644,10 +644,10 @@ doublebuffer0:
 		bra doublebufferend
 doublebuffer1:
 		lda #<.hiword(screenchars0)						; render to screen 0
-		sta to+2
+		sta scr1_to+2
 		lda #<.hiword(screenchars1)
 		sta zp0+2
-		sta from+2
+		sta scr1_from+2
 		lda #<.loword(screen1)							; show screen 1
 		sta $d060
 		lda #>.loword(screen1)
@@ -794,159 +794,26 @@ doublebufferend:
 
 		;jmp endirq
 
-		lda frame
-		and #%00001111
-		tax
-		lda shifts,x
-		sta shift
+		jsr dochaosscreen1
 
-		lda shifts,x
-		asl								; multiply shift by 8 to get yshift
-		asl
-		asl
-		sta yto+0
-		sta yfrom+0
+		lda flipflop
+		bne doublebuffer3
+doublebuffer2:
+		lda #<.hiword(screenchars3)						; render to screen 1
+		sta scr1_to+2
+		lda #<.hiword(screenchars2)
+		sta zp0+2
+		sta scr1_from+2
+		bra doublebufferend2
+doublebuffer3:
+		lda #<.hiword(screenchars3)						; render to screen 0
+		sta scr1_to+2
+		lda #<.hiword(screenchars2)
+		sta zp0+2
+		sta scr1_from+2
+doublebufferend2:
 
-		lda #$00
-		sta yto+1
-		sta yfrom+1
-
-		;lda #$1c
-		;sta $d020
-
-		ldx #14							; loop x 15 times
-
-xloop		
-			;clc
-			txa
-			adc shift
-			sta xfrom
-			lda shift					; get shift again but assign to xfrom/to
-			sta xto
-
-			ldy #14						; loop y 15 times
-yloop
-
-				;clc
-				;lda xto
-				and #%00000111
-				adc yto+0
-				sta to+0
-
-				lda xto
-				and #%11111000
-				adc yto+1
-				sta to+1
-
-				;clc
-				lda xfrom
-				and #%00000111
-				adc yfrom+0
-				sta from+0
-
-				lda xfrom
-				and #%11111000
-				adc yfrom+1
-				sta from+1
-
-				ldz #16
-zloop:
-					;inc $d020
-
-					sta $d707										; inline DMA copy
-					;.byte $06										; Disable use of transparent value
-					;.byte $07										; Enable use of transparent value					;.byte $82, $00									; Source skip rate (256ths of bytes)
-					.byte $83, $08									; Source skip rate (whole bytes)
-					;.byte $84, $00									; Destination skip rate (256ths of bytes)
-					.byte $85, $08									; Destination skip rate (whole bytes)
-					.byte $00										; end of job options
-					.byte $00										; copy
-					.word 16										; count
-from				.word $0000										; src
-					.byte <.hiword(screenchars0)					; src bank and flags
-to					.word $0000										; dst
-					.byte <.hiword(screenchars1)					; dst bank and flags
-					.byte $00										; cmd hi
-					.word $0000										; modulo, ignored
-
-					dez
-					beq exit_zloop
-
-					inc from+0
-					inc to+0
-
-					lda from+0
-					and #7
-					bne from_not_crossed
-;from_crossed
-					lda from+0
-					bne from_not_crossed_hi
-					inc from+1
-from_not_crossed_hi	;clc
-					adc #<(((256/8)*64)-8)			; add $0800-8 (32 char * 64 pixels per char)
-					sta from+0
-					lda from+1
-					adc #>(((256/8)*64)-8)
-					sta from+1
-from_not_crossed
-
-					lda to+0
-					and #7
-					bne zloop; to_not_crossed
-;to_crossed
-					lda to+0
-					bne to_not_crossed_hi
-					inc to+1
-to_not_crossed_hi	;clc
-					adc #<(((256/8)*64)-8)
-					sta to+0
-					lda to+1
-					adc #>(((256/8)*64)-8)
-					sta to+1
-to_not_crossed
-
-					bra zloop
-
-exit_zloop:
-
-				;clc
-				lda xfrom
-				adc #15							; was 16, but I was subtracting one again afterwards
-				sta xfrom
-
-				;clc
-				lda yfrom+0
-				adc #$08
-				sta yfrom+0
-				lda yfrom+1
-				adc #$00
-				sta yfrom+1
-				
-				;clc
-				lda xto
-				adc #16
-				sta xto
-
-				dey
-				bmi exit_yloop
-				jmp yloop
-
-exit_yloop:
-
-			dex
-			bmi exit_xloop
-
-			;clc
-			lda yto+0
-			adc #128				; add 2*64 to get to next row, 2 characters below this one
-			sta yto+0
-			lda yto+1
-			adc #0
-			sta yto+1
-
-			jmp xloop
-
-exit_xloop:
+		PLOTCOLOURPIXEL 16, 16, 240
 
 		;lda #$10
 		;sta $d020
@@ -971,6 +838,168 @@ endirq:
 		pla
 		asl $d019
 		rti
+
+; ----------------------------------------------------------------------------------------------------
+
+dochaosscreen1:
+
+		lda frame
+		and #%00001111
+		tax
+		lda shifts,x
+		sta shift
+
+		lda shifts,x
+		asl								; multiply shift by 8 to get yshift
+		asl
+		asl
+		sta yto+0
+		sta yfrom+0
+
+		lda #$00
+		sta yto+1
+		sta yfrom+1
+
+		;lda #$1c
+		;sta $d020
+
+		ldx #14							; loop x 15 times
+
+scr1_xloop:		
+			;clc
+			txa
+			adc shift
+			sta xfrom
+			lda shift					; get shift again but assign to xfrom/to
+			sta xto
+
+			ldy #14						; loop y 15 times
+scr1_yloop:
+
+				;clc
+				;lda xto
+				and #%00000111
+				adc yto+0
+				sta scr1_to+0
+
+				lda xto
+				and #%11111000
+				adc yto+1
+				sta scr1_to+1
+
+				;clc
+				lda xfrom
+				and #%00000111
+				adc yfrom+0
+				sta scr1_from+0
+
+				lda xfrom
+				and #%11111000
+				adc yfrom+1
+				sta scr1_from+1
+
+				ldz #16
+scr1_zloop:
+					;inc $d020
+
+					sta $d707										; inline DMA copy
+					;.byte $06										; Disable use of transparent value
+					;.byte $07										; Enable use of transparent value					;.byte $82, $00									; Source skip rate (256ths of bytes)
+					.byte $83, $08									; Source skip rate (whole bytes)
+					;.byte $84, $00									; Destination skip rate (256ths of bytes)
+					.byte $85, $08									; Destination skip rate (whole bytes)
+					.byte $00										; end of job options
+					.byte $00										; copy
+					.word 16										; count
+scr1_from			.word $0000										; src
+					.byte <.hiword(screenchars0)					; src bank and flags
+scr1_to				.word $0000										; dst
+					.byte <.hiword(screenchars1)					; dst bank and flags
+					.byte $00										; cmd hi
+					.word $0000										; modulo, ignored
+
+					dez
+					beq scr1_exit_zloop
+
+					inc scr1_from+0
+					inc scr1_to+0
+
+					lda scr1_from+0
+					and #7
+					bne scr1_from_not_crossed
+
+					lda scr1_from+0
+					bne scr1_from_not_crossed_hi
+					inc scr1_from+1
+scr1_from_not_crossed_hi:
+					;clc
+					adc #<(((256/8)*64)-8)			; add $0800-8 (32 char * 64 pixels per char)
+					sta scr1_from+0
+					lda scr1_from+1
+					adc #>(((256/8)*64)-8)
+					sta scr1_from+1
+scr1_from_not_crossed:
+
+					lda scr1_to+0
+					and #7
+					bne scr1_zloop
+
+					lda scr1_to+0
+					bne scr1_to_not_crossed_hi
+					inc scr1_to+1
+scr1_to_not_crossed_hi:
+					;clc
+					adc #<(((256/8)*64)-8)
+					sta scr1_to+0
+					lda scr1_to+1
+					adc #>(((256/8)*64)-8)
+					sta scr1_to+1
+scr1_to_not_crossed:
+
+					bra scr1_zloop
+
+scr1_exit_zloop:
+
+				;clc
+				lda xfrom
+				adc #15							; was 16, but I was subtracting one again afterwards
+				sta xfrom
+
+				;clc
+				lda yfrom+0
+				adc #$08
+				sta yfrom+0
+				lda yfrom+1
+				adc #$00
+				sta yfrom+1
+				
+				;clc
+				lda xto
+				adc #16
+				sta xto
+
+				dey
+				bmi scr1_exit_yloop
+				jmp scr1_yloop
+
+scr1_exit_yloop:
+
+			dex
+			bmi scr1_exit_xloop
+
+			;clc
+			lda yto+0
+			adc #128				; add 2*64 to get to next row, 2 characters below this one
+			sta yto+0
+			lda yto+1
+			adc #0
+			sta yto+1
+
+			jmp scr1_xloop
+
+scr1_exit_xloop:
+
+			rts
 
 ; ----------------------------------------------------------------------------------------------------
 
