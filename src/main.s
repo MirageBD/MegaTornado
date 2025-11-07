@@ -7,8 +7,8 @@
 
 .define screenchars0		$10000
 .define screenchars1		$20000
-.define screenchars2		$10000
-.define screenchars3		$20000
+.define screenchars2		$30000
+.define screenchars3		$40000
 
 .define moddata				$50000
 
@@ -27,8 +27,8 @@
 .define MULTINB				$d774
 .define MULTOUT				$d778
 
-; 2*28+1
-.define CHARSPERROW			57*2
+; 2*(28+1)	; 2 screens, both having 28 chars and 1 gotox
+.define CHARSPERROW			58*2
 
 ; ----------------------------------------------------------------------------------------------------
 
@@ -221,18 +221,28 @@ pal		lda verticalcenter+0
 
 
 		; set colour ram to gotox and transparency
-		ldx #0
 		lda #<.loword(SAFE_COLOR_RAM)
+		ldx #>.loword(SAFE_COLOR_RAM)
+		ldy #<.hiword(SAFE_COLOR_RAM)
+		ldz #>.hiword(SAFE_COLOR_RAM)
 		sta zp0+0
-		lda #>.loword(SAFE_COLOR_RAM)
-		sta zp0+1
-		lda #<.hiword(SAFE_COLOR_RAM)
-		sta zp0+2
-		lda #>.hiword(SAFE_COLOR_RAM)
-		sta zp0+3
+		stx zp0+1
+		sty zp0+2
+		stz zp0+3
+
+		ldx #0
 gotoxloop:
-		lda #%10010000
-		ldz #28*2
+		ldz #28*2+0
+		lda #%10010000			; set gotox and transparency
+		sta [zp0],z
+		ldz #28*2+1
+		lda #%00000000			; set pixel row flag mask to 0
+		sta [zp0],z
+		ldz #57*2+0
+		lda #%10010000			; set gotox and transparency
+		sta [zp0],z
+		ldz #57*2+1
+		lda #%00000000			; set pixel row flag mask to 0
 		sta [zp0],z
 		clc
 		lda zp0+0
@@ -244,9 +254,79 @@ gotoxloop:
 		inx
 		cpx #28
 		bne gotoxloop
+
+		lda #<.loword(screen0)
+		ldx #>.loword(screen0)
+		ldy #<.hiword(screen0)
+		ldz #>.hiword(screen0)
+		sta zp0+0
+		stx zp0+1
+		sty zp0+2
+		stz zp0+3
+
+		ldx #0
+gotoxposscreen1loop:
+		ldz #28*2+0
+		lda #<0					; set first gotox position to 0
+		sta [zp0],z
+		ldz #28*2+1
+		lda #>0					; set first gotox position to 0
+		sta [zp0],z
+		ldz #57*2+0
+		lda #<320				; set second (and last) gotox position to 320
+		sta [zp0],z
+		ldz #57*2+1
+		lda #>320				; set second (and last) gotox position to 320
+		sta [zp0],z
+		clc
+		lda zp0+0
+		adc #CHARSPERROW
+		sta zp0+0
+		lda zp0+1
+		adc #0
+		sta zp0+1
+		inx
+		cpx #28
+		bne gotoxposscreen1loop
+
+		lda #<.loword(screen1)
+		ldx #>.loword(screen1)
+		ldy #<.hiword(screen1)
+		ldz #>.hiword(screen1)
+		sta zp0+0
+		stx zp0+1
+		sty zp0+2
+		stz zp0+3
+
+		ldx #0
+gotoxposscreen2loop:
+		ldz #28*2+0
+		lda #<0					; set first gotox position to 0
+		sta [zp0],z
+		ldz #28*2+1
+		lda #>0					; set first gotox position to 0
+		sta [zp0],z
+		ldz #57*2+0
+		lda #<320				; set second (and last) gotox position to 320
+		sta [zp0],z
+		ldz #57*2+1
+		lda #>320				; set second (and last) gotox position to 320
+		sta [zp0],z
+		clc
+		lda zp0+0
+		adc #CHARSPERROW
+		sta zp0+0
+		lda zp0+1
+		adc #0
+		sta zp0+1
+		inx
+		cpx #28
+		bne gotoxposscreen2loop
+
 		; set new gotox position in screen ram 0 and 1
 		; WE'RE PRESUMING IT'S ALREADY 0 - DANGEROUS, BUT I'M LAZY!
 
+		
 
 
 
