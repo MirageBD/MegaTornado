@@ -19,7 +19,7 @@
 .define xto					$0c
 .define xfrom				$0d
 
-.define shiftx				$0e
+.define shift				$0e
 
 .define flipflop			$0f
 
@@ -29,6 +29,10 @@
 
 ; 2*(28+1)	; 2 screens, both having 28 chars and 1 gotox
 .define CHARSPERROW			58*2
+
+; the screen is 28 chars wide and high because
+; we're rendering to a 240x240 area, but we chop off the left/right and top/bottom chars because they contain
+; garbage, so 240-8-8=224 and 224/8 = 28
 
 ; ----------------------------------------------------------------------------------------------------
 
@@ -273,10 +277,10 @@ gotoxposscreen1loop:
 		lda #>0					; set first gotox position to 0
 		sta [zp0],z
 		ldz #57*2+0
-		lda #<320				; set second (and last) gotox position to 320
+		lda #<(28*8+4)			; set second (and last) gotox position to the right side of the screen (+4 for the borders)
 		sta [zp0],z
 		ldz #57*2+1
-		lda #>320				; set second (and last) gotox position to 320
+		lda #>(28*8+4)			; set second (and last) gotox position to the right side of the screen (+4 for the borders)
 		sta [zp0],z
 		clc
 		lda zp0+0
@@ -307,10 +311,10 @@ gotoxposscreen2loop:
 		lda #>0					; set first gotox position to 0
 		sta [zp0],z
 		ldz #57*2+0
-		lda #<320				; set second (and last) gotox position to 320
+		lda #<(28*8+4)			; set second (and last) gotox position to the right side of the screen (+4 for the borders)
 		sta [zp0],z
 		ldz #57*2+1
-		lda #>320				; set second (and last) gotox position to 320
+		lda #>(28*8+4)			; set second (and last) gotox position to the right side of the screen (+4 for the borders)
 		sta [zp0],z
 		clc
 		lda zp0+0
@@ -794,7 +798,7 @@ doublebufferend:
 		and #%00001111
 		tax
 		lda shifts,x
-		sta shiftx
+		sta shift
 
 		lda shifts,x
 		asl								; multiply shift by 8 to get yshift
@@ -815,9 +819,9 @@ doublebufferend:
 xloop		
 			;clc
 			txa
-			adc shiftx
+			adc shift
 			sta xfrom
-			lda shiftx					; get shift again but assign to xfrom/to
+			lda shift					; get shift again but assign to xfrom/to
 			sta xto
 
 			ldy #14						; loop y 15 times
@@ -1115,7 +1119,7 @@ clearbitmap2job:
 				.byte $82, $00									; Source skip rate (256ths of bytes)
 				.byte $83, $01									; Source skip rate (whole bytes)
 				.byte $84, $00									; Destination skip rate (256ths of bytes)
-				.byte $85, $02									; Destination skip rate (whole bytes)
+				.byte $85, $01									; Destination skip rate (whole bytes)
 
 				.byte $00										; No more options
 
@@ -1124,7 +1128,7 @@ clearbitmap2job:
 
 				.word 0 ; 240*256								; Count LSB + Count MSB
 
-				.word $0001										; this is normally the source addres, but contains the fill value now
+				.word $0000										; this is normally the source addres, but contains the fill value now
 				.byte $00										; source bank (ignored)
 
 				.word $0000										; Destination Address LSB + Destination Address MSB
@@ -1143,7 +1147,7 @@ clearbitmap3job:
 				.byte $82, $00									; Source skip rate (256ths of bytes)
 				.byte $83, $01									; Source skip rate (whole bytes)
 				.byte $84, $00									; Destination skip rate (256ths of bytes)
-				.byte $85, $02									; Destination skip rate (whole bytes)
+				.byte $85, $01									; Destination skip rate (whole bytes)
 
 				.byte $00										; No more options
 
@@ -1152,7 +1156,7 @@ clearbitmap3job:
 
 				.word 0 ; 240*256								; Count LSB + Count MSB
 
-				.word $0001										; this is normally the source addres, but contains the fill value now
+				.word $0000										; this is normally the source addres, but contains the fill value now
 				.byte $00										; source bank (ignored)
 
 				.word $0000										; Destination Address LSB + Destination Address MSB
