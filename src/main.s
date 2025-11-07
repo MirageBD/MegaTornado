@@ -154,6 +154,30 @@ entry_main
 		lda #$50										; set TEXTXPOS to same as SDBDRWDLSB
 		sta $d04c
 
+		lda #$55 ; #$55									; CHRXSCL - we want to scale 240 up to 320 and the default value of xscale is 120 (why not 128?), so (120*(240/320) = 90)
+		sta $d05a
+
+		lda #$40										; start of top border
+		sta $d048
+		lda #$44										; Y Position Where Character Display Starts ($D04E LSB, 0–3 of $D04F MSB)
+		sta $d04e
+		lda #28											; set number of rows
+		sta $d07b
+		lda #$08										; start of bottom border
+		sta $d04a
+		lda #$02
+		sta $d04b
+		lda #$4e										; set TEXTXPOS
+		sta $d04c
+		lda #$4a										; set left border
+		sta $d05c
+
+
+		lda #<$0800										; set (offset!) pointer to colour ram
+		sta $d064
+		lda #>$0800
+		sta $d065
+
 		DMA_RUN_JOB clearcolorramjob
 		DMA_RUN_JOB clearbitmap0job
 		DMA_RUN_JOB clearbitmap1job
@@ -277,10 +301,10 @@ gotoxposscreen1loop:
 		lda #>0					; set first gotox position to 0
 		sta [zp0],z
 		ldz #57*2+0
-		lda #<(28*8+4)			; set second (and last) gotox position to the right side of the screen (+4 for the borders)
+		lda #<400 ; (28*8+4)			; set second (and last) gotox position to the right side of the screen (+4 for the borders)
 		sta [zp0],z
 		ldz #57*2+1
-		lda #>(28*8+4)			; set second (and last) gotox position to the right side of the screen (+4 for the borders)
+		lda #>400 ; (28*8+4)			; set second (and last) gotox position to the right side of the screen (+4 for the borders)
 		sta [zp0],z
 		clc
 		lda zp0+0
@@ -311,10 +335,10 @@ gotoxposscreen2loop:
 		lda #>0					; set first gotox position to 0
 		sta [zp0],z
 		ldz #57*2+0
-		lda #<(28*8+4)			; set second (and last) gotox position to the right side of the screen (+4 for the borders)
+		lda #<400 ; (28*8+4)			; set second (and last) gotox position to the right side of the screen (+4 for the borders)
 		sta [zp0],z
 		ldz #57*2+1
-		lda #>(28*8+4)			; set second (and last) gotox position to the right side of the screen (+4 for the borders)
+		lda #>400 ; (28*8+4)			; set second (and last) gotox position to the right side of the screen (+4 for the borders)
 		sta [zp0],z
 		clc
 		lda zp0+0
@@ -327,39 +351,8 @@ gotoxposscreen2loop:
 		cpx #28
 		bne gotoxposscreen2loop
 
-		; set new gotox position in screen ram 0 and 1
-		; WE'RE PRESUMING IT'S ALREADY 0 - DANGEROUS, BUT I'M LAZY!
-
-		
 
 
-
-
-
-
-		lda #$55 ; #$55									; CHRXSCL - we want to scale 240 up to 320 and the default value of xscale is 120 (why not 128?), so (120*(240/320) = 90)
-		sta $d05a
-
-		lda #$40										; start of top border
-		sta $d048
-		lda #$44										; Y Position Where Character Display Starts ($D04E LSB, 0–3 of $D04F MSB)
-		sta $d04e
-		lda #28											; set number of rows
-		sta $d07b
-		lda #$08										; start of bottom border
-		sta $d04a
-		lda #$02
-		sta $d04b
-		lda #$4e										; set TEXTXPOS
-		sta $d04c
-		lda #$4a										; set left border
-		sta $d05c
-
-
-		lda #<$0800										; set (offset!) pointer to colour ram
-		sta $d064
-		lda #>$0800
-		sta $d065
 
 		lda $d070										; select mapped bank with the upper 2 bits of $d070
 		and #%00111111
@@ -664,6 +657,39 @@ doublebufferend:
 		inc plotcol
 :
 
+		PLOTCOLOURPIXEL 126, 126, 0
+		PLOTCOLOURPIXEL 127, 126, 8
+		PLOTCOLOURPIXEL 128, 126, 16
+
+		PLOTCOLOURPIXEL 126, 127, 0
+		PLOTCOLOURPIXEL 127, 127, 8
+		PLOTCOLOURPIXEL 128, 127, 16
+
+		PLOTCOLOURPIXEL 126, 128, 0
+		PLOTCOLOURPIXEL 127, 128, 8
+		PLOTCOLOURPIXEL 128, 128, 16
+
+		;jmp endirq
+
+		jsr dochaosscreen1
+
+		lda flipflop
+		bne doublebuffer3
+doublebuffer2:
+		lda #<.hiword(screenchars3)						; render to screen 1
+		sta scr2_to+2
+		lda #<.hiword(screenchars2)
+		sta zp0+2
+		sta scr2_from+2
+		bra doublebufferend2
+doublebuffer3:
+		lda #<.hiword(screenchars2)						; render to screen 0
+		sta scr2_to+2
+		lda #<.hiword(screenchars3)
+		sta zp0+2
+		sta scr2_from+2
+doublebufferend2:
+
 		ldx frame
 		lda sine,x
 		lsr
@@ -780,40 +806,14 @@ doublebufferend:
 		sta particlecolour
 		jsr drawparticle
 
-		PLOTCOLOURPIXEL 126, 126, 0
-		PLOTCOLOURPIXEL 127, 126, 8
-		PLOTCOLOURPIXEL 128, 126, 16
 
-		PLOTCOLOURPIXEL 126, 127, 0
-		PLOTCOLOURPIXEL 127, 127, 8
-		PLOTCOLOURPIXEL 128, 127, 16
+		lda #$e0
+		sta $d020
 
-		PLOTCOLOURPIXEL 126, 128, 0
-		PLOTCOLOURPIXEL 127, 128, 8
-		PLOTCOLOURPIXEL 128, 128, 16
+		jsr dochaosscreen2
 
-		;jmp endirq
-
-		jsr dochaosscreen1
-
-		lda flipflop
-		bne doublebuffer3
-doublebuffer2:
-		lda #<.hiword(screenchars3)						; render to screen 1
-		sta scr1_to+2
-		lda #<.hiword(screenchars2)
-		sta zp0+2
-		sta scr1_from+2
-		bra doublebufferend2
-doublebuffer3:
-		lda #<.hiword(screenchars3)						; render to screen 0
-		sta scr1_to+2
-		lda #<.hiword(screenchars2)
-		sta zp0+2
-		sta scr1_from+2
-doublebufferend2:
-
-		PLOTCOLOURPIXEL 16, 16, 240
+		lda #$10
+		sta $d020
 
 		;lda #$10
 		;sta $d020
@@ -865,7 +865,7 @@ dochaosscreen1:
 
 		ldx #14							; loop x 15 times
 
-scr1_xloop:		
+scr1_yloop:		
 			;clc
 			txa
 			adc shift
@@ -874,7 +874,7 @@ scr1_xloop:
 			sta xto
 
 			ldy #14						; loop y 15 times
-scr1_yloop:
+scr1_xloop:
 
 				;clc
 				;lda xto
@@ -979,13 +979,13 @@ scr1_exit_zloop:
 				sta xto
 
 				dey
-				bmi scr1_exit_yloop
-				jmp scr1_yloop
+				bmi scr1_exit_xloop
+				jmp scr1_xloop
 
-scr1_exit_yloop:
+scr1_exit_xloop:
 
 			dex
-			bmi scr1_exit_xloop
+			bmi scr1_exit_yloop
 
 			;clc
 			lda yto+0
@@ -995,9 +995,192 @@ scr1_exit_yloop:
 			adc #0
 			sta yto+1
 
-			jmp scr1_xloop
+			jmp scr1_yloop
 
-scr1_exit_xloop:
+scr1_exit_yloop:
+
+			rts
+
+; ----------------------------------------------------------------------------------------------------
+
+
+dochaosscreen2:
+
+		lda frame
+		and #%00001111
+		tax
+		lda overlayshifts,x
+		sta shift
+
+		lda overlayshifts,x
+		asl								; multiply shift by 8 to get yshift
+		asl
+		asl
+		sta yto+0
+		sta yfrom+0
+
+		lda #$00
+		sta yto+1
+		sta yfrom+1
+
+		;lda #$1c
+		;sta $d020
+
+
+
+		; yfrom = shift
+		; yto   = shift
+
+		;     xfrom = shift
+		;     xto   = shift
+		;
+		;         to   =   xto + yto
+		;         from = xfrom + yfrom
+		;
+		;		      plot square (yto doesn't have to change because because it's always the same at the start of the vertical DMA plot)
+		;
+		;         xfrom += 16 ; move to the next square
+		;         xto   += 16
+		;         yfrom += 8 (why is yfrom incremented, though. My memory is failing again)
+		;
+		;    yto += 128 (2 chars down = 2*64)
+
+
+		ldx #14							; loop x 15 times
+
+scr2_yloop:		
+			;clc
+			txa
+			adc shift
+			sta xfrom
+			lda shift					; get shift again but assign to xfrom/to
+			sta xto
+
+			ldy #14						; loop y 15 times
+scr2_xloop:
+
+				;clc
+				;lda xto
+				and #%00000111
+				adc yto+0
+				sta scr2_to+0
+
+				lda xto
+				and #%11111000
+				adc yto+1
+				sta scr2_to+1
+
+				;clc
+				lda xfrom
+				and #%00000111
+				adc yfrom+0
+				sta scr2_from+0
+
+				lda xfrom
+				and #%11111000
+				adc yfrom+1
+				sta scr2_from+1
+
+				ldz #16
+scr2_zloop:
+					;inc $d020
+
+					sta $d707										; inline DMA copy
+					;.byte $06										; Disable use of transparent value
+					;.byte $07										; Enable use of transparent value					;.byte $82, $00									; Source skip rate (256ths of bytes)
+					.byte $83, $08									; Source skip rate (whole bytes)
+					;.byte $84, $00									; Destination skip rate (256ths of bytes)
+					.byte $85, $08									; Destination skip rate (whole bytes)
+					.byte $00										; end of job options
+					.byte $00										; copy
+					.word 16										; count
+scr2_from			.word $0000										; src
+					.byte <.hiword(screenchars2)					; src bank and flags
+scr2_to				.word $0000										; dst
+					.byte <.hiword(screenchars3)					; dst bank and flags
+					.byte $00										; cmd hi
+					.word $0000										; modulo, ignored
+
+					dez
+					beq scr2_exit_zloop
+
+					inc scr2_from+0
+					inc scr2_to+0
+
+					lda scr2_from+0
+					and #7
+					bne scr2_from_not_crossed
+
+					lda scr2_from+0
+					bne scr2_from_not_crossed_hi
+					inc scr2_from+1
+scr2_from_not_crossed_hi:
+					;clc
+					adc #<(((256/8)*64)-8)			; add $0800-8 (32 char * 64 pixels per char)
+					sta scr2_from+0
+					lda scr2_from+1
+					adc #>(((256/8)*64)-8)
+					sta scr2_from+1
+scr2_from_not_crossed:
+
+					lda scr2_to+0
+					and #7
+					bne scr2_zloop
+
+					lda scr2_to+0
+					bne scr2_to_not_crossed_hi
+					inc scr2_to+1
+scr2_to_not_crossed_hi:
+					;clc
+					adc #<(((256/8)*64)-8)
+					sta scr2_to+0
+					lda scr2_to+1
+					adc #>(((256/8)*64)-8)
+					sta scr2_to+1
+scr2_to_not_crossed:
+
+					bra scr2_zloop
+
+scr2_exit_zloop:
+
+				;clc
+				lda xfrom
+				adc #15							; was 16, but I was subtracting one again afterwards
+				sta xfrom
+
+				;clc
+				lda yfrom+0
+				adc #$08
+				sta yfrom+0
+				lda yfrom+1
+				adc #$00
+				sta yfrom+1
+				
+				;clc
+				lda xto
+				adc #16
+				sta xto
+
+				dey
+				bmi scr2_exit_xloop
+				jmp scr2_xloop
+
+scr2_exit_xloop:
+
+			dex
+			bmi scr2_exit_yloop
+
+			;clc
+			lda yto+0
+			adc #128				; add 2*64 to get to next row, 2 characters below this one
+			sta yto+0
+			lda yto+1
+			adc #0
+			sta yto+1
+
+			jmp scr2_yloop
+
+scr2_exit_yloop:
 
 			rts
 
@@ -1016,6 +1199,13 @@ maxd012				.byte 0
 shifts
 					.byte 0, 8, 4, 12, 2, 10, 6, 14
 					.byte 1, 9, 5, 13, 3, 11, 7, 15
+
+overlayshifts
+					;.byte 0, 8, 4, 12, 2, 10, 6, 14
+					;.byte 1, 9, 5, 13, 3, 11, 7, 15
+
+					.byte 14, 6, 10, 2, 12, 4, 8, 0
+					.byte 15, 7, 11, 3, 13, 5, 9, 1
 
 ; ----------------------------------------------------------------------------------------------------
 
