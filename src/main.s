@@ -1006,31 +1006,36 @@ scr1_exit_yloop:
 
 dochaosscreen2:
 
-		lda frame
-		and #%00001111
-		tax
-		lda overlayshifts,x
-		sta shift
+		; yfrom = shift
+		; yto   = shift
 
-		lda overlayshifts,x
-		asl								; multiply shift by 8 to get yshift
-		asl
-		asl
-		sta yto+0
-		sta yfrom+0
-
-		lda #$00
-		sta yto+1
-		sta yfrom+1
-
-		;lda #$1c
-		;sta $d020
-
+		;  y = 14 to 0
+		;  {
+		;      xto   = shift
+		;      xfrom = shift + y
+		;
+		;      x = 14 to 0
+		;      {
+		;          to   = address(  xto, yto  )
+		;          from = address(xfrom, yfrom)
+		;
+		;          z = 16 to 0
+		;          {
+		;		       plot square (yto doesn't have to change because because it's always the same at the start of the vertical DMA plot)
+		;          }
+		;
+		;          xto   += 16
+		;          xfrom += 15 ; move to the next square
+		;          yfrom += 8 (why is yfrom incremented, though. My memory is failing again)
+		;      }
+		;
+		;      yto += 128 (2 chars down = 2*64)
+		; }
 
 		;   (xfrom - xto) (yfrom - yto)
 
 		; +---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+
-		; |  14     |  13 +01 |  12 +02 |  11 +03 |  10 +04 |  09 +05 |  08 +06 |  07  07 |  06  08 |  05  09 |  04  10 |  03 +11 |  02 +12 |  01  13 |      14 |
+		; |  14     |  13  01 |  12  02 |  11  03 |  10  04 |  09  05 |  08  06 |  07  07 |  06  08 |  05  09 |  04  10 |  03  11 |  02  12 |  01  13 |      14 |
 		; +---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+
 		; |  13 -01 |  12     |  11  01 |  10  02 |  09  03 |  08  04 |  07  05 |  06  06 |  05  07 |  04  08 |  03  09 |  02  10 |  01  11 |      12 | -01  13 |
 		; +---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+
@@ -1062,32 +1067,22 @@ dochaosscreen2:
 		; +---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+
 
 
-		; yfrom = shift
-		; yto   = shift
+		lda frame
+		and #%00001111
+		tax
+		lda overlayshifts,x
+		sta shift
 
-		;  y = 14 to 0
-		;  {
-		;      xto   = shift
-		;      xfrom = shift + y
-		;
-		;      x = 14 to 0
-		;      {
-		;          to   = address(  xto, yto  )
-		;          from = address(xfrom, yfrom)
-		;
-		;          z = 16 to 0
-		;          {
-		;		       plot square (yto doesn't have to change because because it's always the same at the start of the vertical DMA plot)
-		;          }
-		;
-		;          xto   += 16
-		;          xfrom += 15 ; move to the next square
-		;          yfrom += 8 (why is yfrom incremented, though. My memory is failing again)
-		;      }
-		;
-		;      yto += 128 (2 chars down = 2*64)
-		; }
+		lda overlayshifts,x
+		asl								; multiply shift by 8 to get yshift
+		asl
+		asl
+		sta yto+0
+		sta yfrom+0
 
+		lda #$00
+		sta yto+1
+		sta yfrom+1
 
 		ldy #14							; loop x 15 times
 
