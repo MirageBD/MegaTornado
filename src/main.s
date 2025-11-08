@@ -422,9 +422,9 @@ loop
 setuptextscreen:
 
 		lda zp0+0
-		sta put12+1
+		sta stsdstlo+1
 		lda zp0+1
-		sta put13+1
+		sta stsdsthi+1
 
 		lda #txtstartrow
 		sta screenrow
@@ -451,7 +451,7 @@ stsloop:
 		adc #0
 		sta zp0+1
 
-		inc screenrow									;  increase row
+		inc screenrow									; increase row
 		lda screenrow
 		cmp #(txtstartrow + txtheight)					; have we reached the end row?
 		bne stsloop
@@ -464,10 +464,10 @@ stsloop:
 		cmp #(2*(txtstartcolumn+txtwidth))				; have we reached the end column?
 		beq endscreenplot
 
-put12:	lda #<$c0de										; reset start position
-		sta zp0+0
-put13:	lda #>$c0de
-		sta zp0+1
+stsdstlo:	lda #<$c0de										; reset start position
+			sta zp0+0
+stsdsthi:	lda #>$c0de
+			sta zp0+1
 
 		clc												; and set new column position
 		lda zp0+0
