@@ -215,34 +215,46 @@ pal		lda verticalcenter+0
 		sta $d063
 
 
+		; higher bytes for all text screens
+		lda #0
+		sta zp0+2
+		sta zp0+3
 
 		; screen 1 'left'
+		ldx #<(screen0+0)	; low byte destination
+		ldy #>(screen0+0)	; high byte destination
+		stx zp0+0
+		sty zp0+1
 		ldx #<(screenchars0 / 64 + 2*32 + 2)				; add two columns and 2 rows
 		ldy #>(screenchars0 / 64 + 2*32 + 2)
-		lda #>screen0	; high byte destination
-		ldz #0			; low byte destination
 		jsr setuptextscreen
 
 		; screen 1 'right'
+		ldx #<(screen0+2*28+2)	; low byte destination (+1 for gotox)
+		ldy #>(screen0+2*28+2)	; high byte destination
+		stx zp0+0
+		sty zp0+1
 		ldx #<(screenchars2 / 64 + 2*32 + 2)				; add two columns and 2 rows
 		ldy #>(screenchars2 / 64 + 2*32 + 2)
-		lda #>screen0	; high byte destination
-		ldz #2*28+2		; low byte destination (+1 for gotox)
 		jsr setuptextscreen
 
 
 		; screen 2 'left'
+		ldx #<(screen1+0)	; low byte destination
+		ldy #>(screen1+0)	; high byte destination
+		stx zp0+0
+		sty zp0+1
 		ldx #<(screenchars1 / 64 + 2*32 + 2)
 		ldy #>(screenchars1 / 64 + 2*32 + 2)
-		lda #>screen1	; high byte destination
-		ldz #0			; low byte destination
 		jsr setuptextscreen
 
 		; screen 2 'right'
+		ldx #<(screen1+2*28+2)	; low byte destination (+1 for gotox)
+		ldy #>(screen1+2*28+2)	; high byte destination
+		stx zp0+0
+		sty zp0+1
 		ldx #<(screenchars3 / 64 + 2*32 + 2)				; add two columns and 2 rows
 		ldy #>(screenchars3 / 64 + 2*32 + 2)
-		lda #>screen1	; high byte destination
-		ldz #2*28+2		; low byte destination (+1 for gotox)
 		jsr setuptextscreen
 
 
@@ -409,10 +421,9 @@ loop
 
 setuptextscreen:
 
-		stz zp0+0
-		stz put12+1
-
-		sta zp0+1
+		lda zp0+0
+		sta put12+1
+		lda zp0+1
 		sta put13+1
 
 		lda #txtstartrow
@@ -420,27 +431,17 @@ setuptextscreen:
 		lda #txtstartcolumn
 		sta screencolumn
 
-		lda #0
-		sta zp0+2
-		sta zp0+3
-
 stsloop:
 
+		txa
 		ldz #0
-		txa
 		sta [zp0],z
 
+		tya
 		ldz #1
-		tya
 		sta [zp0],z
 
-		clc												; add 1 to character address
-		txa
-		adc #$01
-		tax
-		tya
-		adc #$00
-		tay
+		inx												; add 1 to character address
 
 		clc												; and move to next row
 		lda zp0+0
@@ -450,9 +451,9 @@ stsloop:
 		adc #0
 		sta zp0+1
 
-		inc screenrow									;  have we reached the end row?
+		inc screenrow									;  increase row
 		lda screenrow
-		cmp #(txtstartrow + txtheight)
+		cmp #(txtstartrow + txtheight)					; have we reached the end row?
 		bne stsloop
 
 		lda #txtstartrow								; we have reached the end row
@@ -463,12 +464,12 @@ stsloop:
 		cmp #(txtstartcolumn+txtwidth)*2				; have we reached the end column?
 		beq endscreenplot
 
-put12	ldz #0											; calculate new start position here
-		stz zp0+0
-put13	lda #>screen0									; reset the destination high byte
+put12	lda #0											; reset start position
+		sta zp0+0
+put13	lda #0
 		sta zp0+1
 
-		clc
+		clc												; and set new column position
 		lda zp0+0
 		adc screencolumn
 		sta zp0+0
