@@ -409,13 +409,10 @@ loop
 
 setuptextscreen:
 
-		stz put10+1
+		stz zp0+0
 		stz put12+1
-		inz
-		stz put11+1
 
-		sta put10+2
-		sta put11+2
+		sta zp0+1
 		sta put13+1
 
 		lda #txtstartrow
@@ -423,8 +420,19 @@ setuptextscreen:
 		lda #txtstartcolumn
 		sta screencolumn
 
-put10	stx screen0+0
-put11	sty screen0+1
+		lda #0
+		sta zp0+2
+		sta zp0+3
+
+stsloop:
+
+		ldz #0
+		txa
+		sta [zp0],z
+
+		ldz #1
+		tya
+		sta [zp0],z
 
 		clc												; add 1 to character address
 		txa
@@ -435,20 +443,17 @@ put11	sty screen0+1
 		tay
 
 		clc												; and move to next row
-		lda put10+1
+		lda zp0+0
 		adc #CHARSPERROW
-		sta put10+1
-		sta put11+1
-		lda put10+2
+		sta zp0+0
+		lda zp0+1
 		adc #0
-		sta put10+2
-		sta put11+2
-		inc put11+1
+		sta zp0+1
 
 		inc screenrow									;  have we reached the end row?
 		lda screenrow
 		cmp #(txtstartrow + txtheight)
-		bne put10
+		bne stsloop
 
 		lda #txtstartrow								; we have reached the end row
 		sta screenrow									; reset row back to 0
@@ -458,23 +463,15 @@ put11	sty screen0+1
 		cmp #(txtstartcolumn+txtwidth)*2				; have we reached the end column?
 		beq endscreenplot
 
-		; calculate new start position here
-
-put12	ldz #0
-		stz put10+1
-		inz
-		stz put11+1
+put12	ldz #0											; calculate new start position here
+		stz zp0+0
 put13	lda #>screen0									; reset the destination high byte
-		sta put10+2
-		sta put11+2
+		sta zp0+1
 
 		clc
-		lda put10+1
+		lda zp0+0
 		adc screencolumn
-		sta put10+1
-		lda put11+1
-		adc screencolumn
-		sta put11+1
+		sta zp0+0
 
 		clc												; add remainder to character address
 		txa
@@ -484,7 +481,7 @@ put13	lda #>screen0									; reset the destination high byte
 		adc #$00
 		tay
 
-		jmp put10
+		jmp stsloop
 
 endscreenplot
 		rts
@@ -1269,7 +1266,7 @@ clearcolorramjob
 
 				.word CHARSPERROW*28							; Count LSB + Count MSB
 
-				.word $0007										; this is normally the source addres, but contains the fill value now
+				.word %00000000									; this is normally the source addres, but contains the fill value now
 				.byte $00										; source bank (ignored)
 
 				.word ((SAFE_COLOR_RAM) & $ffff)				; Destination Address LSB + Destination Address MSB
