@@ -461,12 +461,12 @@ stsloop:
 		inc screencolumn								; and increase the column
 		inc screencolumn
 		lda screencolumn
-		cmp #(txtstartcolumn+txtwidth)*2				; have we reached the end column?
+		cmp #(2*(txtstartcolumn+txtwidth))				; have we reached the end column?
 		beq endscreenplot
 
-put12	lda #0											; reset start position
+put12:	lda #<$c0de										; reset start position
 		sta zp0+0
-put13	lda #0
+put13:	lda #>$c0de
 		sta zp0+1
 
 		clc												; and set new column position
@@ -484,7 +484,7 @@ put13	lda #0
 
 		jmp stsloop
 
-endscreenplot
+endscreenplot:
 		rts
 
 ; ----------------------------------------------------------------------------------------------------		
