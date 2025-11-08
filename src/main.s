@@ -1011,8 +1011,8 @@ dochaosscreen2:
 
 		;  y = 14 to 0
 		;  {
-		;      xto   = shift
-		;      xfrom = shift + y
+		;      xto   = 0 + shift
+		;      xfrom = y + shift
 		;
 		;      x = 14 to 0
 		;      {
@@ -1025,8 +1025,8 @@ dochaosscreen2:
 		;          }
 		;
 		;          xto   += 16
-		;          xfrom += 15 ; move to the next square
-		;          yfrom += 8 (why is yfrom incremented, though. My memory is failing again)
+		;          xfrom += 15 ; move to the next square, xfrom -= 1
+		;          yfrom += 8  ;                          yfrom += 1
 		;      }
 		;
 		;      yto += 128 (2 chars down = 2*64)
@@ -1073,16 +1073,16 @@ dochaosscreen2:
 		lda overlayshifts,x
 		sta shift
 
+		lda #$00
+		sta yto+1
+		sta yfrom+1
+
 		lda overlayshifts,x
 		asl								; multiply shift by 8 to get yshift
 		asl
 		asl
 		sta yto+0
 		sta yfrom+0
-
-		lda #$00
-		sta yto+1
-		sta yfrom+1
 
 		ldy #14							; loop x 15 times
 
