@@ -863,17 +863,17 @@ dochaosscreen1:
 		;lda #$1c
 		;sta $d020
 
-		ldx #14							; loop x 15 times
+		ldy #14							; loop x 15 times
 
 scr1_yloop:		
 			;clc
-			txa
+			tya
 			adc shift
 			sta xfrom
 			lda shift					; get shift again but assign to xfrom/to
 			sta xto
 
-			ldy #14						; loop y 15 times
+			ldx #14						; loop y 15 times
 scr1_xloop:
 
 				;clc
@@ -978,13 +978,13 @@ scr1_exit_zloop:
 				adc #16
 				sta xto
 
-				dey
+				dex
 				bmi scr1_exit_xloop
 				jmp scr1_xloop
 
 scr1_exit_xloop:
 
-			dex
+			dey
 			bmi scr1_exit_yloop
 
 			;clc
@@ -1031,32 +1031,41 @@ dochaosscreen2:
 		; yfrom = shift
 		; yto   = shift
 
-		;     xfrom = shift
-		;     xto   = shift
+		;  y = 14 to 0
+		;  {
+		;      xfrom = shift + y
+		;      xto   = shift
 		;
-		;         to   =   xto + yto
-		;         from = xfrom + yfrom
+		;      x = 14 to 0
+		;      {
+		;          from = address(xfrom, yfrom)
+		;          to   = address(  xto, yto  )
 		;
-		;		      plot square (yto doesn't have to change because because it's always the same at the start of the vertical DMA plot)
+		;          z = 16 to 0
+		;          {
+		;		       plot square (yto doesn't have to change because because it's always the same at the start of the vertical DMA plot)
+		;          }
 		;
-		;         xfrom += 16 ; move to the next square
-		;         xto   += 16
-		;         yfrom += 8 (why is yfrom incremented, though. My memory is failing again)
+		;          xfrom += 15 ; move to the next square
+		;          xto   += 16
+		;          yfrom += 8 (why is yfrom incremented, though. My memory is failing again)
+		;      }
 		;
-		;    yto += 128 (2 chars down = 2*64)
+		;      yto += 128 (2 chars down = 2*64)
+		; }
 
 
-		ldx #14							; loop x 15 times
+		ldy #14							; loop x 15 times
 
 scr2_yloop:		
 			;clc
-			txa
+			tya
 			adc shift
 			sta xfrom
 			lda shift					; get shift again but assign to xfrom/to
 			sta xto
 
-			ldy #14						; loop y 15 times
+			ldx #14						; loop y 15 times
 scr2_xloop:
 
 				;clc
@@ -1161,13 +1170,13 @@ scr2_exit_zloop:
 				adc #16
 				sta xto
 
-				dey
+				dex
 				bmi scr2_exit_xloop
 				jmp scr2_xloop
 
 scr2_exit_xloop:
 
-			dex
+			dey
 			bmi scr2_exit_yloop
 
 			;clc
