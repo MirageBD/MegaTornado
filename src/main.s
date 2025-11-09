@@ -234,9 +234,9 @@ pal		lda verticalcenter+0
 		ldy #>(screen0+2*28+2)	; high byte destination
 		stx zp0+0
 		sty zp0+1
-		ldx #<(screenchars2 / 64 + 2*32 + 2)				; add two columns and 2 rows
-		ldy #>(screenchars2 / 64 + 2*32 + 2)
-		jsr setuptextscreen
+		ldx #<(screenchars2 / 64 + 29*32 + 2)				; add two columns and 2 rows
+		ldy #>(screenchars2 / 64 + 29*32 + 2)
+		jsr setupinversetextscreen
 
 
 		; screen 2 'left'
@@ -253,11 +253,26 @@ pal		lda verticalcenter+0
 		ldy #>(screen1+2*28+2)	; high byte destination
 		stx zp0+0
 		sty zp0+1
-		ldx #<(screenchars3 / 64 + 2*32 + 2)				; add two columns and 2 rows
-		ldy #>(screenchars3 / 64 + 2*32 + 2)
-		jsr setuptextscreen
+		ldx #<(screenchars3 / 64 + 29*32 + 2)			; add two columns and 2 rows
+		ldy #>(screenchars3 / 64 + 29*32 + 2)
+		jsr setupinversetextscreen
 
 
+		; higher bytes for all colour screens
+		lda #<.hiword(SAFE_COLOR_RAM)
+		sta zp0+2
+		lda #>.hiword(SAFE_COLOR_RAM)
+		sta zp0+3
+		; colour screen 1 'right', flip chars
+		ldx #<(2*28+2)	; low byte destination (+1 for gotox)
+		lda #>(2*28+2)	; high byte destination
+		ora #$08
+		tay
+		stx zp0+0
+		sty zp0+1
+		ldx #%01000000	; horizontally flip char
+		ldy #%00000000
+		jsr setupcolourscreen
 
 
 		; set colour ram to gotox and transparency
@@ -464,7 +479,7 @@ stsloop:
 		cmp #(2*(txtstartcolumn+txtwidth))				; have we reached the end column?
 		beq endscreenplot
 
-stsdstlo:	lda #<$c0de										; reset start position
+stsdstlo:	lda #<$c0de									; reset start position
 			sta zp0+0
 stsdsthi:	lda #>$c0de
 			sta zp0+1
@@ -487,6 +502,136 @@ stsdsthi:	lda #>$c0de
 endscreenplot:
 		rts
 
+; ----------------------------------------------------------------------------------------------------
+
+setupinversetextscreen:
+
+		lda zp0+0
+		sta sitsdstlo+1
+		lda zp0+1
+		sta sitsdsthi+1
+
+		lda #txtstartrow
+		sta screenrow
+		lda #txtstartcolumn
+		sta screencolumn
+
+sitsloop:
+
+		txa
+		ldz #0
+		sta [zp0],z
+
+		tya
+		ldz #1
+		sta [zp0],z
+
+		inx												; add 1 to character address
+
+		clc												; and move to next row
+		lda zp0+0
+		adc #CHARSPERROW
+		sta zp0+0
+		lda zp0+1
+		adc #0
+		sta zp0+1
+
+		inc screenrow									; increase row
+		lda screenrow
+		cmp #(txtstartrow + txtheight)					; have we reached the end row?
+		bne sitsloop
+
+		lda #txtstartrow								; we have reached the end row
+		sta screenrow									; reset row back to 0
+		inc screencolumn								; and increase the column
+		inc screencolumn
+		lda screencolumn
+		cmp #(2*(txtstartcolumn+txtwidth))				; have we reached the end column?
+		beq endinversescreenplot
+
+sitsdstlo:	lda #<$c0de									; reset start position
+			sta zp0+0
+sitsdsthi:	lda #>$c0de
+			sta zp0+1
+
+		clc												; and set new column position
+		lda zp0+0
+		adc screencolumn
+		sta zp0+0
+
+		sec												; subtract remainder to character address
+		txa
+		sbc #<(32+txtheight)
+		tax
+		tya
+		sbc #$00
+		tay
+
+		jmp sitsloop
+
+endinversescreenplot:
+		rts
+
+; ----------------------------------------------------------------------------------------------------
+
+setupcolourscreen:
+
+		lda zp0+0
+		sta scsdstlo+1
+		lda zp0+1
+		sta scsdsthi+1
+
+		lda #txtstartrow
+		sta screenrow
+		lda #txtstartcolumn
+		sta screencolumn
+
+scsloop:
+
+		txa
+		ldz #0
+		sta [zp0],z
+
+		tya
+		ldz #1
+		sta [zp0],z
+
+		clc												; and move to next row
+		lda zp0+0
+		adc #CHARSPERROW
+		sta zp0+0
+		lda zp0+1
+		adc #0
+		sta zp0+1
+
+		inc screenrow									; increase row
+		lda screenrow
+		cmp #(txtstartrow + txtheight)					; have we reached the end row?
+		bne scsloop
+
+		lda #txtstartrow								; we have reached the end row
+		sta screenrow									; reset row back to 0
+		inc screencolumn								; and increase the column
+		inc screencolumn
+		lda screencolumn
+		cmp #(2*(txtstartcolumn+txtwidth))				; have we reached the end column?
+		beq endcolourplot
+
+scsdstlo:	lda #<$c0de									; reset start position
+			sta zp0+0
+scsdsthi:	lda #>$c0de
+			sta zp0+1
+
+		clc												; and set new column position
+		lda zp0+0
+		adc screencolumn
+		sta zp0+0
+
+		jmp scsloop
+
+endcolourplot:
+		rts
+
 ; ----------------------------------------------------------------------------------------------------		
 
 .align 256
@@ -498,16 +643,6 @@ curcos			.byte 0
 tempbyte		.byte 0
 particlecolour	.byte 0
 particlesize	.byte 2
-
-.macro PLOTCOLOURPIXEL offsetx, offsety, coladd
-		ldx #offsetx
-		ldy #offsety
-		lda #coladd
-		sta plotcoladd
-
-		jsr calcplotpixel
-		jsr plotcolourpixel
-.endmacro
 
 calcplotpixel
 		;lda #<.loword((offsetx/8) * (256*8) + (offsetx & 7) + offsety * 8)
@@ -545,6 +680,16 @@ calcplotpixel
 		sta zp0+1
 		rts
 
+.macro PLOTCOLOURPIXEL offsetx, offsety, coladd
+		ldx #offsetx
+		ldy #offsety
+		lda #coladd
+		sta plotcoladd
+
+		jsr calcplotpixel
+		jsr plotcolourpixel
+.endmacro
+
 plotcolourpixel
 
 		ldz #$00
@@ -552,6 +697,7 @@ plotcolourpixel
 		clc
 		adc plotcoladd
 		and #$7f
+		ora #$80
 		sta [zp0],z
 		rts
 
@@ -607,7 +753,7 @@ plotxloop:
 irq1
 		pha
 
-		lda #$08
+		lda #$88
 		sta $d020
 
 		lda #0
@@ -688,15 +834,7 @@ doublebuffer3:
 		sta scr2_from+2
 doublebufferend2:
 
-		ldx frame
-		lda sine,x
-		lsr
-		lsr
-		lsr
-		lsr
-		lsr
-		lsr
-		adc #$02
+		lda #06
 		sta particlesize
 
 		lda frame
@@ -721,19 +859,11 @@ doublebufferend2:
 		adc #127-16
 		sta curcos
 
-		lda #$80
+		lda #$00
 		sta particlecolour
 		jsr drawparticle
 
-		ldx frame
-		lda sine+64,x
-		lsr
-		lsr
-		lsr
-		lsr
-		lsr
-		lsr
-		adc #$04
+		lda #06
 		sta particlesize
 
 		lda frame
@@ -760,22 +890,11 @@ doublebufferend2:
 		adc #127-32
 		sta curcos
 
-		lda #$90
+		lda #$10
 		sta particlecolour
 		jsr drawparticle
 
-		lda frame
-		asl
-		asl
-		lda sine+64,x
-		lsr
-		lsr
-		lsr
-		lsr
-		lsr
-		lsr
-		lsr
-		adc #$06
+		lda #06
 		sta particlesize
 
 		lda frame
@@ -800,17 +919,18 @@ doublebufferend2:
 		adc #127-64
 		sta curcos
 
-		lda #$a0
+		lda #$20
 		sta particlecolour
 		jsr drawparticle
 
 
-		lda #$e0
+		lda #$90
 		sta $d020
+
 
 		jsr dochaosscreen2
 
-		lda #$10
+		lda #$88
 		sta $d020
 
 		;lda #$10
