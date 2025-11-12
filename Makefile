@@ -50,6 +50,7 @@ default: all
 OBJS = $(EXE_DIR)/boot.o $(EXE_DIR)/main.o
 
 BINFILES  = $(BIN_DIR)/bitmap_pal0.bin
+BINFILES += $(BIN_DIR)/sprites_chars0.bin
 BINFILES += $(BIN_DIR)/song.mod
 
 # -----------------------------------------------------------------------------
@@ -57,6 +58,9 @@ BINFILES += $(BIN_DIR)/song.mod
 $(BIN_DIR)/bitmap_pal0.bin: $(BIN_DIR)/bitmap.bin
 	$(MC) $< cm1:1 d1:3 cl1:10000 rc1:0
 
+$(BIN_DIR)/sprites_chars0.bin: $(BIN_DIR)/sprites.bin
+	$(MC) $< cm1:1 d1:1 cl1:50000 rc1:0
+	
 $(EXE_DIR)/boot.o:	$(SRC_DIR)/boot.s \
 					$(SRC_DIR)/main.s \
 					$(SRC_DIR)/irqload.s \

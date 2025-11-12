@@ -5,12 +5,17 @@
 
 .define palette				$c000
 
+.define lineartable			$c800
+.define slope_top			$ca00
+
 .define screenchars0		$10000
 .define screenchars1		$20000
 .define screenchars2		$30000
 .define screenchars3		$40000
 
-.define moddata				$50000
+.define moddata				$52000
+
+.define spritemem			$50000
 
 .define zp0					$04								; size = 4
 
@@ -26,6 +31,8 @@
 .define MULTINA				$d770
 .define MULTINB				$d774
 .define MULTOUT				$d778
+.define DIVOUTWHOLE			$d768
+.define DIVOUTFRACT			$d76c
 
 ; 2*(28+1)	; 2 screens, both having 28 chars and 1 gotox
 .define CHARSPERROW			58*2
@@ -38,6 +45,9 @@
 
 .segment "PALETTE"
 		.incbin "../bin/bitmap_pal0.bin"
+
+.segment "SPRITES"
+		.incbin "../bin/sprites_chars0.bin"
 
 .segment "SONG"
 		.incbin "../bin/song.mod"
@@ -214,6 +224,13 @@ pal		lda verticalcenter+0
 		lda #>.hiword(screen0)
 		sta $d063
 
+		;  create linear table for slope/delta sprite plotting
+		ldx #$00
+setuplt:
+		txa
+		sta lineartable,x
+		inx
+		bne setuplt
 
 		; higher bytes for all text screens
 		lda #0
@@ -824,6 +841,7 @@ doublebufferend:
 doublebuffer2:
 		lda #<.hiword(screenchars3)						; render to screen 1
 		sta scr2_to+2
+		sta dll2_lindadrbnk
 		lda #<.hiword(screenchars2)
 		sta zp0+2
 		sta scr2_from+2
@@ -831,11 +849,13 @@ doublebuffer2:
 doublebuffer3:
 		lda #<.hiword(screenchars2)						; render to screen 0
 		sta scr2_to+2
+		sta dll2_lindadrbnk
 		lda #<.hiword(screenchars3)
 		sta zp0+2
 		sta scr2_from+2
 doublebufferend2:
 
+/*
 		lda #06
 		sta particlesize
 		lda #$00
@@ -932,6 +952,29 @@ doublebufferend2:
 
 
 		jsr dochaosscreen2
+*/
+
+		lda #0
+		sta simplesprite_src_xpos
+		lda #8
+		sta simplesprite_src_ypos
+		lda #16
+		sta simplesprite_src_width
+		sta simplesprite_src_height
+		lda #64										; DRUNK YOU, BE CAREFUL BECAUSE THIS LAYER HAS X/Y FLIPPED CHARACTERS!
+		sta simplesprite_dst_xpos+2
+		sta simplesprite_dst_ypos+2
+		ldx frame
+		lda sine,x
+		lsr
+		lsr
+		clc
+		adc #1
+		sta simplesprite_dst_width
+		sta simplesprite_dst_height
+
+		jsr simplesprite_draw
+		;jsr dochaosscreen2
 
 		lda #$88
 		sta $d020
@@ -1343,6 +1386,178 @@ scr2_exit_yloop:
 
 ; ----------------------------------------------------------------------------------------------------
 
+simplesprite_draw:
+
+				lda simplesprite_src_xpos			; set left point for src address
+				sta gsp1_linsadr+0
+				lda simplesprite_src_ypos			; set source xpos
+				sta dll2_linsadr+0
+
+				ldq q0
+				stq MULTINA
+				stq MULTINB
+
+				lda simplesprite_src_width			; 16 / 32 = 0.5
+				sta MULTINA+2
+				lda simplesprite_dst_width
+				sta MULTINB+0
+
+				lda $d020
+				sta $d020
+				lda $d020
+				sta $d020
+				lda $d020
+				sta $d020
+
+				lda DIVOUTFRACT+1
+				sta gsp1_linskiplo+1
+				lda DIVOUTFRACT+2
+				sta gsp1_linskiphi+1
+
+				lda simplesprite_src_height			; DMA skip = srcheight/dstheight
+				sta MULTINA+2
+				lda simplesprite_dst_height
+				sta MULTINB+0
+				sta dll2_linsize
+
+				lda $d020
+				sta $d020
+				lda $d020
+				sta $d020
+				lda $d020
+				sta $d020
+
+				lda DIVOUTFRACT+1
+				sta dll2_linskiplo+1
+				lda DIVOUTFRACT+2
+				sta dll2_linskiphi+1
+
+				lda simplesprite_dst_width				; sample x points where x is destination width
+				sta gsp1_linsize+0
+
+				sta $d707								; inline DMA
+				.byte $06								; Disable use of transparent value
+gsp1_linskiplo:	.byte $82, 0							; Source skip rate (256ths of bytes)
+gsp1_linskiphi:	.byte $83, 1							; Source skip rate (whole bytes)
+				.byte $84, 0							; Destination skip rate (256ths of bytes)
+				.byte $85, 1							; Destination skip rate (whole bytes) skip 8 bytes to get to next vertical pixel
+				.byte $8f, %00000000					; bit 7 = enable DESTINATION line drawing, Bit 6 = select X or Y direction, Bit 5 = slope is negative.
+				.byte $00								; end of job options
+
+				.byte %00000000							; copy (bit 5 = invert source, bit 6 = invert destination)
+gsp1_linsize:	.word 16								; count - needs initialising
+gsp1_linsadr:	.word lineartable						; src
+				.byte $00								; src bank and flags
+gsp1_lindadr:	.word slope_top							; dst
+				.byte $00								; dst bank and flags
+				.byte $00								; cmd hi
+				.word $0000								; modulo, ignored
+
+				; for VERTICAL drawing, sprites need to have their columns laid out HORIZONTALLY/LINEAR in memory
+				; so use d1:1 = PixelTopBottomLeftRight for the sprite gfx in makefile
+				; make the sprite sheet 256 high, so increasing source address high byte will move to the next line
+
+				ldq q0
+				stq MULTINA
+				stq MULTINB
+
+				lda simplesprite_dst_xpos+2				; calculate destination column
+				sta MULTINA+0
+				lda simplesprite_dst_xpos+3
+				sta MULTINA+1
+
+				lsr MULTINA+1
+				ror MULTINA+0
+				lsr MULTINA+1
+				ror MULTINA+0
+				lsr MULTINA+1
+				ror MULTINA+0
+
+				lda #<((256/8)*64)
+				sta MULTINB+0
+				lda #>((256/8)*64)
+				sta MULTINB+1
+
+				lda MULTOUT+0
+				sta dll2_lindadr+0
+				lda MULTOUT+1
+				sta dll2_lindadr+1
+
+				; calculate destination pixel in char
+				lda simplesprite_dst_xpos+2	
+				and #$07
+				ora dll2_lindadr+0
+				sta dll2_lindadr+0
+
+				; calculate and add destination row
+				lda #<8
+				sta MULTINA+0
+				;lda #>8
+				;sta MULTINA+1
+
+				ldq simplesprite_dst_ypos
+				stq MULTINB+0
+
+				clc
+				lda dll2_lindadr+0
+				adc MULTOUT+2
+				sta dll2_lindadr+0
+				lda dll2_lindadr+1
+				adc MULTOUT+3
+				sta dll2_lindadr+1
+
+				ldx #0
+draw_simplesprite_loop:
+				lda slope_top,x
+				sta dll2_linsadr+1
+
+				sta $d707								; inline DMA
+				.byte $07								; Enable use of transparent value
+dll2_linskiplo:	.byte $82, $80							; Source skip rate (256ths of bytes)
+dll2_linskiphi:	.byte $83, $00							; Source skip rate (whole bytes) ; ignored when drawing lines (but destination is NOT drawing lines)
+				.byte $84, 0							; Destination skip rate (256ths of bytes)
+				.byte $85, 8							; Destination skip rate (whole bytes) skip 8 bytes to get to next vertical pixel
+				.byte $8f, %00000000					; bit 7 = enable DESTINATION line drawing, Bit 6 = select X or Y direction, Bit 5 = slope is negative.
+				.byte $9f, %00000000					; bit 7 = enable SOURCE line drawing, Bit 6 = select X or Y direction, Bit 5 = slope is negative.
+				.byte $00								; end of job options
+
+dll2_lincmd:	.byte %00000000							; copy (bit 5 = invert source, bit 6 = invert destination)
+dll2_linsize:	.word 16								; count - needs initialising
+dll2_linsadr:	.word $0000								; src
+				.byte ((spritemem >> 16) & $0f)			; src bank and flags
+dll2_lindadr:	.word $0000								; dst
+dll2_lindadrbnk:.byte $03								; dst bank and flags
+				.byte $00								; cmd hi
+				.word $0000								; modulo, ignored
+
+				inc dll2_lindadr+0
+				lda dll2_lindadr+0
+
+				and #$07
+				bne dll2_not_crossed      ; if not zero, didn’t cross a boundary
+;dll2_crossed:
+				lda dll2_lindadr+0
+				bne dll2_not_crossed_hi
+				inc dll2_lindadr+1
+dll2_not_crossed_hi:
+				clc
+				adc #<(((256/8)*64)-8)
+				sta dll2_lindadr+0
+				lda dll2_lindadr+1
+				adc #>(((256/8)*64)-8)
+				sta dll2_lindadr+1
+
+dll2_not_crossed:
+
+				inx
+				cpx simplesprite_dst_width
+				bne draw_simplesprite_loop
+
+draw_simplesprite_done:
+				rts
+
+; ----------------------------------------------------------------------------------------------------
+
 frame				.byte 0
 screenrow			.byte 0
 screencolumn		.byte 0
@@ -1360,6 +1575,22 @@ shifts
 overlayshifts
 					.byte 0, 8, 4, 12, 2, 10, 6, 14
 					.byte 1, 9, 5, 13, 3, 11, 7, 15
+
+simplesprite_dst_scale:		.word $0100
+
+simplesprite_src_xpos:		.byte 0
+simplesprite_src_ypos:		.byte 0
+
+simplesprite_src_width:		.byte 16
+simplesprite_src_height:	.byte 16
+
+simplesprite_dst_xpos:		.dword 32
+simplesprite_dst_ypos:		.dword 32
+
+simplesprite_dst_width:		.byte 0
+simplesprite_dst_height:	.byte 0
+
+q0							.byte 0,0,0,0
 
 ; ----------------------------------------------------------------------------------------------------
 

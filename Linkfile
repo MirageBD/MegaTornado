@@ -7,5 +7,6 @@ SEGMENTS
 {
 	MAIN:			load=RAM, start=$2100;
 	PALETTE:		load=RAM, start=$c000;
-	SONG:			load=RAM, start=$50000;
+	SPRITES:		load=RAM, start=$50000;
+	SONG:			load=RAM, start=$52000;
 }
