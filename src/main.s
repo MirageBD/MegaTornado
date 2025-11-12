@@ -982,6 +982,7 @@ doublebufferend2:
 		;lda #$10
 		;sta $d020
 
+/*
 		clc
 		lda $d012
 		cmp maxd012
@@ -989,9 +990,7 @@ doublebufferend2:
 		sta maxd012
 		sta $c000
 :		
-
-		;DMA_RUN_JOB clearbitmap0checkeredjob
-		;DMA_RUN_JOB clearbitmap1checkeredjob
+*/
 
 endirq:
 
