@@ -157,19 +157,40 @@ entry_main
 		lda #$55 ; #$55									; CHRXSCL - we want to scale 240 up to 320 and the default value of xscale is 120 (why not 128?), so (120*(240/320) = 90)
 		sta $d05a
 
-		lda #$40										; start of top border
-		sta $d048
+		
+		lda #$40										; pal y border start
+		sta verticalcenter+0
+		lda #0
+		sta verticalcenter+1
 		lda #$44										; Y Position Where Character Display Starts ($D04E LSB, 0–3 of $D04F MSB)
 		sta $d04e
+
+		bit $d06f
+		bpl pal
+
+ntsc	lda #<55										; ntsc y border start
+		sta verticalcenter+0
+		lda #>55
+		sta verticalcenter+1
+		lda #$44										; Y Position Where Character Display Starts ($D04E LSB, 0–3 of $D04F MSB)
+		sta $d04e
+
+pal		lda verticalcenter+0
+		sta $d048
+		lda #%00001111
+		trb $d049
+		lda verticalcenter+1
+		tsb $d049
+
 		lda #28											; set number of rows
 		sta $d07b
 		lda #$08										; start of bottom border
 		sta $d04a
 		lda #$02
 		sta $d04b
-		lda #$4e										; set TEXTXPOS
+		lda #$50										; set TEXTXPOS
 		sta $d04c
-		lda #$4a										; set left border
+		lda #$4b										; set left border
 		sta $d05c
 
 
@@ -183,27 +204,6 @@ entry_main
 		DMA_RUN_JOB clearbitmap1job
 		DMA_RUN_JOB clearbitmap2job
 		DMA_RUN_JOB clearbitmap3job
-
-		; pal y border start
-		lda #<104
-		sta verticalcenter+0
-		lda #>104
-		sta verticalcenter+1
-
-		bit $d06f
-		bpl pal
-
-ntsc	lda #<55
-		sta verticalcenter+0
-		lda #>55
-		sta verticalcenter+1
-
-pal		lda verticalcenter+0
-		sta $d048
-		lda #%00001111
-		trb $d049
-		lda verticalcenter+1
-		tsb $d049
 
 		lda #<.loword(screen0)							; set pointer to screen ram
 		sta $d060
@@ -288,16 +288,16 @@ pal		lda verticalcenter+0
 		ldx #0
 gotoxloop:
 		ldz #28*2+0
-		lda #%10010000			; set gotox and transparency
+		lda #%10010000					; set gotox and transparency
 		sta [zp0],z
 		ldz #28*2+1
-		lda #%00000000			; set pixel row flag mask to 0
+		lda #%00000000					; set pixel row flag mask to 0
 		sta [zp0],z
 		ldz #57*2+0
-		lda #%10010000			; set gotox and transparency
+		lda #%10010000					; set gotox and transparency
 		sta [zp0],z
 		ldz #57*2+1
-		lda #%00000000			; set pixel row flag mask to 0
+		lda #%00000000					; set pixel row flag mask to 0
 		sta [zp0],z
 		clc
 		lda zp0+0
@@ -322,10 +322,10 @@ gotoxloop:
 		ldx #0
 gotoxposscreen1loop:
 		ldz #28*2+0
-		lda #<0					; set first gotox position to 0
+		lda #<0							; set first gotox position to 0
 		sta [zp0],z
 		ldz #28*2+1
-		lda #>0					; set first gotox position to 0
+		lda #>0							; set first gotox position to 0
 		sta [zp0],z
 		ldz #57*2+0
 		lda #<400 ; (28*8+4)			; set second (and last) gotox position to the right side of the screen (+4 for the borders)
@@ -753,6 +753,8 @@ plotxloop:
 irq1
 		pha
 
+		jsr peppitoPlay
+
 		lda #$88
 		sta $d020
 
@@ -836,9 +838,12 @@ doublebufferend2:
 
 		lda #06
 		sta particlesize
+		lda #$00
+		sta particlecolour
 
 		lda frame
 		eor #255
+		asl
 		asl
 		tax
 		lda sine,x
@@ -856,15 +861,15 @@ doublebufferend2:
 		lsr
 		lsr
 		lsr
-		adc #127-16
+		adc #127-24
 		sta curcos
 
-		lda #$00
-		sta particlecolour
 		jsr drawparticle
 
 		lda #06
 		sta particlesize
+		lda #$10
+		sta particlecolour
 
 		lda frame
 		adc #4
@@ -873,29 +878,28 @@ doublebufferend2:
 		asl
 		tax
 		lda sine,x
-		lsr
-		lsr
-		lsr
-		adc #127-16
-		sta cursin
-
-		lda frame
-		adc #4
-		eor #255
-		asl
-		tax
-		lda sine+64,x
 		lsr
 		lsr
 		adc #127-32
+		sta cursin
+
+		lda frame
+		adc #4
+		eor #255
+		asl
+		tax
+		lda sine+64,x
+		lsr
+		lsr
+		adc #127-40
 		sta curcos
 
-		lda #$10
-		sta particlecolour
 		jsr drawparticle
 
 		lda #06
 		sta particlesize
+		lda #$20
+		sta particlecolour
 
 		lda frame
 		adc #4
@@ -916,15 +920,14 @@ doublebufferend2:
 		tax
 		lda sine+64,x
 		lsr
-		adc #127-64
+		lsr
+		adc #127-40
 		sta curcos
 
-		lda #$20
-		sta particlecolour
 		jsr drawparticle
 
 
-		lda #$90
+		lda #$88
 		sta $d020
 
 
@@ -943,8 +946,6 @@ doublebufferend2:
 		sta maxd012
 		sta $c000
 :		
-
-		;jsr peppitoPlay
 
 		;DMA_RUN_JOB clearbitmap0checkeredjob
 		;DMA_RUN_JOB clearbitmap1checkeredjob
