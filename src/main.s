@@ -720,57 +720,10 @@ plotcolourpixel
 
 ; ----------------------------------------------------------------------------------------------------
 
-drawparticle
-
-		ldy #0
-plotyloop:
-
-		ldx #0
-plotxloop:
-		phy
-		phx
-
-		clc
-		txa
-		adc cursin
-		tax
-
-		clc
-		tya
-		adc curcos
-		tay
-
-		jsr calcplotpixel
-		;txa
-		;sta plotcoladd
-		;jsr plotcolourpixel
-
-		plx
-		ply
-
-		clc
-		txa
-		sta tempbyte
-		tya
-		adc tempbyte
-		adc particlecolour
-		sta [zp0],z
-
-		inx
-		cpx particlesize
-		bne plotxloop
-
-		iny
-		cpy particlesize
-		bne plotyloop
-		rts
-
-; ----------------------------------------------------------------------------------------------------
-
 irq1
 		pha
 
-		jsr peppitoPlay
+		;jsr peppitoPlay
 
 		lda #$88
 		sta $d020
@@ -841,25 +794,19 @@ doublebufferend:
 doublebuffer2:
 		lda #<.hiword(screenchars3)						; render to screen 1
 		sta scr2_to+2
-		sta dll2_lindadrbnk
 		lda #<.hiword(screenchars2)
 		sta zp0+2
+		sta dll2_lindadrbnk
 		sta scr2_from+2
 		bra doublebufferend2
 doublebuffer3:
 		lda #<.hiword(screenchars2)						; render to screen 0
 		sta scr2_to+2
-		sta dll2_lindadrbnk
 		lda #<.hiword(screenchars3)
 		sta zp0+2
+		sta dll2_lindadrbnk
 		sta scr2_from+2
 doublebufferend2:
-
-/*
-		lda #06
-		sta particlesize
-		lda #$00
-		sta particlecolour
 
 		lda frame
 		eor #255
@@ -883,13 +830,29 @@ doublebufferend2:
 		lsr
 		adc #127-24
 		sta curcos
-
-		jsr drawparticle
-
-		lda #06
-		sta particlesize
-		lda #$10
-		sta particlecolour
+		
+		lda #0
+		sta simplesprite_src_xpos
+		lda #0
+		sta simplesprite_src_ypos
+		lda #8
+		sta simplesprite_src_width
+		sta simplesprite_src_height
+		lda cursin
+		sta simplesprite_dst_xpos+2
+		lda curcos
+		sta simplesprite_dst_ypos+2
+		ldx frame
+		lda sine,x
+		lsr
+		lsr
+		lsr
+		clc
+		adc #1
+		lda #8
+		sta simplesprite_dst_width
+		sta simplesprite_dst_height
+		jsr simplesprite_draw
 
 		lda frame
 		adc #4
@@ -914,12 +877,28 @@ doublebufferend2:
 		adc #127-40
 		sta curcos
 
-		jsr drawparticle
-
-		lda #06
-		sta particlesize
-		lda #$20
-		sta particlecolour
+		lda #0
+		sta simplesprite_src_xpos
+		lda #8
+		sta simplesprite_src_ypos
+		lda #8
+		sta simplesprite_src_width
+		sta simplesprite_src_height
+		lda cursin
+		sta simplesprite_dst_xpos+2
+		lda curcos
+		sta simplesprite_dst_ypos+2
+		ldx frame
+		lda sine,x
+		lsr
+		lsr
+		lsr
+		clc
+		adc #1
+		lda #8
+		sta simplesprite_dst_width
+		sta simplesprite_dst_height
+		jsr simplesprite_draw
 
 		lda frame
 		adc #4
@@ -944,37 +923,32 @@ doublebufferend2:
 		adc #127-40
 		sta curcos
 
-		jsr drawparticle
-
-
-		lda #$88
-		sta $d020
-
-
-		jsr dochaosscreen2
-*/
-
 		lda #0
 		sta simplesprite_src_xpos
-		lda #8
-		sta simplesprite_src_ypos
 		lda #16
+		sta simplesprite_src_ypos
+		lda #8
 		sta simplesprite_src_width
 		sta simplesprite_src_height
-		lda #64										; DRUNK YOU, BE CAREFUL BECAUSE THIS LAYER HAS X/Y FLIPPED CHARACTERS!
+		lda cursin
 		sta simplesprite_dst_xpos+2
+		lda curcos
 		sta simplesprite_dst_ypos+2
 		ldx frame
 		lda sine,x
 		lsr
 		lsr
+		lsr
 		clc
 		adc #1
+		lda #8
 		sta simplesprite_dst_width
 		sta simplesprite_dst_height
-
 		jsr simplesprite_draw
-		;jsr dochaosscreen2
+
+		jsr dochaosscreen2
+
+
 
 		lda #$88
 		sta $d020
